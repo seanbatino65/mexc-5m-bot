@@ -1,0 +1,65 @@
+{
+  "BTC_USDT": {
+    "MEXC_FUTURES": {
+      "status": "OK",
+      "detail": "Loaded 350 bars, last=72797.4",
+      "checkedAt": "2026-11-12T12:29:13.070Z"
+    }
+  },
+  "ETH_USDT": {
+    "MEXC_FUTURES": {
+      "status": "OK",
+      "detail": "Loaded 350 bars, last=2019.48",
+      "checkedAt": "2026-11-12T12:29:14.592Z"
+    }
+  },
+  "SOL_USDT": {
+    "MEXC_FUTURES": {
+      "status": "OK",
+      "detail": "Loaded 350 bars, last=82.11",
+      "checkedAt": "2026-11-12T12:29:15.036Z"
+    }
+  },
+  "SUI_USDT": {
+    "MEXC_FUTURES": {
+      "status": "OK",
+      "detail": "Loaded 350 bars, last=0.7999",
+      "checkedAt": "2026-11-12T12:29:15.397Z"
+    }
+  },
+  "XRP_USDT": {
+    "MEXC_FUTURES": {
+      "status": "OK",
+      "detail": "Loaded 350 bars, last=1.0332",
+      "checkedAt": "2026-11-12T12:29:15.840Z"
+    }
+  },
+  "ZEC_USDT": {
+    "MEXC_FUTURES": {
+      "status": "OK",
+      "detail": "Loaded 350 bars, last=966.52",
+      "checkedAt": "2026-11-12T12:29:07.432Z"
+    }
+  },
+  "BNB_USDT": {
+    "MEXC_FUTURES": {
+      "status": "OK",
+      "detail": "Loaded 350 bars, last=659.9",
+      "checkedAt": "2026-11-12T12:29:07.800Z"
+    }
+  },
+  "HYPE_USDT": {
+    "MEXC_FUTURES": {
+      "status": "OK",
+      "detail": "Loaded 350 bars, last=70.176",
+      "checkedAt": "2026-11-12T12:29:08.185Z"
+    }
+  },
+  "ONDO_USDT": {
+    "MEXC_FUTURES": {
+      "status": "OK",
+      "detail": "Loaded 350 bars, last=0.3477",
+      "checkedAt": "2026-11-12T12:29:08.564Z"
+    }
+  }
+}

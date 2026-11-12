@@ -1,0 +1,198 @@
+{
+  "campaignStartTimestamp": 1794485880659,
+  "campaignTargetEndTimestamp": 1795090680659,
+  "watchedSymbols": [
+    "BTC_USDT",
+    "ETH_USDT",
+    "SOL_USDT",
+    "SUI_USDT",
+    "XRP_USDT",
+    "ZEC_USDT",
+    "BNB_USDT",
+    "HYPE_USDT",
+    "ONDO_USDT"
+  ],
+  "initialEquity": 10000,
+  "currentEquity": 10000,
+  "peakEquity": 10000,
+  "maxDrawdownPct": 0,
+  "riskPerTradePct": 0.01,
+  "maxLeverage": 10,
+  "takerFeeRate": 0.0002,
+  "makerFeeRate": 0,
+  "openPositions": [
+    {
+      "positionId": "PAPER_V1_1794486405035_BTC_USDT",
+      "accountTag": "V1",
+      "symbol": "BTC_USDT",
+      "side": "LONG",
+      "orderBlockId": "OB_BULL_16",
+      "openedAt": "2026-11-12T12:26:45.035Z",
+      "entryTimestamp": 1794486300000,
+      "entryPrice": 72908.3,
+      "limitEntryPrice": 72894.1,
+      "currentPrice": 72797.5,
+      "initialStopLoss": 72616.67,
+      "currentStopLoss": 72616.67,
+      "tp1Price": 73534.09,
+      "tp2Price": 73539.87,
+      "targetType": "OPPOSING_OB (2.2R)",
+      "initialQty": 0.3429,
+      "remainingQty": 0.3429,
+      "notionalUsd": 25000.27,
+      "initialRiskUsd": 100,
+      "confluenceScore": 85,
+      "orderFlowSignals": [
+        "ABSORPTION",
+        "DELTA_DIVERGENCE",
+        "TRAPPED_SELLERS",
+        "OI_TRAPPED_PERPS",
+        "SPOT_CVD_CONFIRMATION"
+      ],
+      "tp1Hit": false,
+      "realizedPnlUsd": -5,
+      "unrealizedPnlUsd": -37.99,
+      "unrealizedR": -0.43,
+      "feesPaidUsd": 5
+    }
+  ],
+  "closedTrades": [],
+  "v2Account": {
+    "name": "V2 BTC-Compass Sniper (New)",
+    "startedAt": "2026-11-12T12:18:00.659Z",
+    "initialEquity": 10000,
+    "currentEquity": 10000,
+    "peakEquity": 10000,
+    "maxDrawdownPct": 0,
+    "openPositions": [],
+    "closedTrades": []
+  },
+  "signalsFeed": [
+    {
+      "id": "SIG_1794486405035_828",
+      "symbol": "BTC_USDT",
+      "timestamp": 1794486300000,
+      "detectedAt": "2026-11-12T12:26:45.035Z",
+      "side": "LONG",
+      "orderBlockId": "OB_BULL_16",
+      "obZoneLow": 72718.19,
+      "obZoneHigh": 72883.91,
+      "entryPrice": 72908.3,
+      "limitEntryPrice": 72894.1,
+      "pocPrice": 72904.29,
+      "limitRR": 2.33,
+      "stopLoss": 72616.67,
+      "tp1Price": 73534.09,
+      "tp1Type": "VP_POC_MAGNET (2.1R)",
+      "tp2Price": 73539.87,
+      "targetType": "OPPOSING_OB (2.2R)",
+      "confluenceScore": 85,
+      "grade": "A+ SNIPER",
+      "scoreBreakdown": [
+        {
+          "code": "FRESH_OB",
+          "label": "1st-Touch Fresh 5m Order Block",
+          "points": 10,
+          "pillar": "STRUCTURE"
+        },
+        {
+          "code": "FVG_IMBALANCE",
+          "label": "5m Fair Value Gap (FVG) Displacement",
+          "points": 10,
+          "pillar": "STRUCTURE"
+        },
+        {
+          "code": "ABSORPTION",
+          "label": "Carmine Passive Absorption (Wick/Effort vs Result)",
+          "points": 15,
+          "pillar": "ORDERFLOW"
+        },
+        {
+          "code": "DELTA_DIVERGENCE",
+          "label": "Carmine Delta Divergence (Exhaustion)",
+          "points": 10,
+          "pillar": "ORDERFLOW"
+        },
+        {
+          "code": "TRAPPED_TRADERS",
+          "label": "Carmine Trapped Sellers + Delta Flip",
+          "points": 10,
+          "pillar": "ORDERFLOW"
+        },
+        {
+          "code": "OI_TRAPPED_PERPS",
+          "label": "OI + CVD Short Squeeze (OI +0.00% • Perp Shorts Trapped by Spot)",
+          "points": 12,
+          "pillar": "ORDERFLOW"
+        },
+        {
+          "code": "SPOT_CVD_CONFIRMATION",
+          "label": "Spot CVD Leading / Absorbing (Spot +40.1% vs Perp +34.6%)",
+          "points": 8,
+          "pillar": "ORDERFLOW"
+        },
+        {
+          "code": "OROCHI_VWAP_SD",
+          "label": "Orochi Session VWAP ±1.5σ Exhaustion Band",
+          "points": 10,
+          "pillar": "VOLUME_PROFILE_HTF"
+        },
+        {
+          "code": "VP_VWAP_ZONE",
+          "label": "Trader Neil Volume Profile VAL / VWAP Discount Zone",
+          "points": 8,
+          "pillar": "VOLUME_PROFILE_HTF"
+        },
+        {
+          "code": "COUNTER_HTF_PENALTY",
+          "label": "Counter-1H Trend Headwind",
+          "points": -8,
+          "pillar": "VOLUME_PROFILE_HTF"
+        }
+      ],
+      "orderFlowSignals": [
+        "ABSORPTION",
+        "DELTA_DIVERGENCE",
+        "TRAPPED_SELLERS",
+        "OI_TRAPPED_PERPS",
+        "SPOT_CVD_CONFIRMATION"
+      ],
+      "orderFlowMetrics": {
+        "delta": 196180.66,
+        "deltaPct": 34.6,
+        "perpDeltaPct": 34.6,
+        "perpCvd": -4572129,
+        "spotDeltaPct": 40.1,
+        "spotCvd": -112812,
+        "spotCvd4BarPct": -13,
+        "perpCvd4BarPct": -2.5,
+        "oiChangePct": 0,
+        "oiChange3BarPct": 0.62,
+        "oiChange4BarPct": 3.43,
+        "openInterestUsd": 4613416725,
+        "longLiqUsd": 0,
+        "shortLiqUsd": 0,
+        "relVolume": 0.86,
+        "pocPrice": 72904.295,
+        "bullishImbalances": 5,
+        "bearishImbalances": 0
+      },
+      "claudeReview": {
+        "verdict": "APPROVE",
+        "confidence": 90,
+        "reasoning": "📊 Entered: V1 Ongoing Only (V2 Skipped: BTC_DUMPING_1H (-0.49%)) • Counter-1H trend (take 50% at TP1) • Discount below VWAP / Volume Profile VAL • Spot CVD leading (+40.1% vs Perp 34.6%) • RelStrength vs BTC: +0.61% • Breadth: 0% Bull / 100% Bear",
+        "reviewedBy": "Built-In Co-Agent (4-Educator Golden Combo)",
+        "reviewedAt": "2026-11-12T12:26:41.635Z"
+      },
+      "enteredV1": true,
+      "enteredV2": false,
+      "v2GateReason": "BTC_DUMPING_1H (-0.49%)",
+      "source": "MEXC_FUTURES_LIVE"
+    }
+  ],
+  "processedSignalKeys": [
+    "BTC_USDT_OB_BULL_16_1794486300000"
+  ],
+  "lastUpdatedAt": "2026-11-12T12:29:08.803Z",
+  "minScoreThreshold": 70
+}

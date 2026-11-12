@@ -1,0 +1,17 @@
+{
+  "name": "mexc-ob-orderflow-bot",
+  "version": "1.0.0",
+  "description": "MEXC Futures 15m Order Block + Carmine Rosato Order Flow (CLC) Strategy & Backtesting Engine",
+  "type": "module",
+  "scripts": {
+    "backtest": "node src/backtest/runBacktest.js",
+    "optimize": "node src/backtest/runBacktest.js --compare",
+    "fetch-data": "node src/data/mexcDataFetcher.js",
+    "cloud-scan": "node src/cloud/runCloudScan.js",
+    "learn": "node src/learning/autoResearcher.js",
+    "start": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

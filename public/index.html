@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MEXC Futures — 5m Order Block + Order Flow Live Scanner & 7-Day Paper Trader</title>
+  <style>
+    :root {
+      --bg: #080c14;
+      --panel: #111827;
+      --panel-alt: #172033;
+      --border: #24324b;
+      --text: #e2e8f0;
+      --muted: #8b9bb4;
+      --bull: #10b981;
+      --bear: #ef4444;
+      --accent: #3b82f6;
+      --warn: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 16px 20px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    h1 { font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .live-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--bull);
+      box-shadow: 0 0 10px var(--bull);
+      display: inline-block;
+    }
+    .subtitle { color: var(--muted); font-size: 0.82rem; margin-top: 3px; }
+    .tabs { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .tab-btn {
+      background: var(--panel);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.84rem;
+    }
+    .tab-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .kpi-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      border-radius: 9px;
+    }
+    .kpi-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .kpi-val { font-size: 1.25rem; font-weight: 700; margin-top: 5px; }
+    .pos { color: var(--bull); }
+    .neg { color: var(--bear); }
+    .warn { color: var(--warn); }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 2.15fr 1.15fr;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 1100px) { .main-grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .card-title { font-size: 0.92rem; font-weight: 600; color: #cbd5e1; }
+    select, input, button {
+      background: var(--panel-alt);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 6px 11px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+    }
+    button.btn-primary { background: var(--accent); border-color: var(--accent); font-weight: 600; cursor: pointer; }
+    button.btn-secondary { background: #1e293b; border-color: var(--border); cursor: pointer; }
+    button.btn-warn { background: #d97706; border-color: #d97706; color: #fff; font-weight: 600; cursor: pointer; }
+    button:hover { opacity: 0.92; }
+
+    canvas {
+      width: 100%;
+      background: #070a10;
+      border: 1px solid #1a2436;
+      border-radius: 6px;
+      display: block;
+    }
+    #mexcChartCanvas { height: 370px; margin-bottom: 6px; }
+    #deltaChartCanvas { height: 95px; }
+
+    .footprint-box {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 4px;
+      margin-top: 8px;
+      background: #0a0f18;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #1a2436;
+      font-size: 0.7rem;
+    }
+    .fp-cell {
+      text-align: center;
+      padding: 4px;
+      border-radius: 4px;
+      background: #111a29;
+    }
+
+    .signal-card {
+      background: var(--panel-alt);
+      border-left: 4px solid var(--accent);
+      padding: 11px 12px;
+      border-radius: 7px;
+      margin-bottom: 9px;
+      font-size: 0.8rem;
+      position: relative;
+    }
+    .signal-card.LONG { border-left-color: var(--bull); }
+    .signal-card.SHORT { border-left-color: var(--bear); }
+    .signal-card.fresh-signal {
+      box-shadow: 0 0 14px rgba(16, 185, 129, 0.35);
+      border: 1px solid rgba(16, 185, 129, 0.6);
+      border-left-width: 5px;
+    }
+
+    .entry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin: 6px 0;
+    }
+    .entry-box {
+      background: #0d1422;
+      border: 1px solid #22314c;
+      padding: 6px 8px;
+      border-radius: 5px;
+      font-size: 0.75rem;
+    }
+    .entry-box.limit-box {
+      border-color: rgba(16, 185, 129, 0.45);
+      background: rgba(16, 185, 129, 0.06);
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th, td { padding: 8px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-right: 3px;
+    }
+    .badge-long { background: rgba(16, 185, 129, 0.18); color: #34d399; }
+    .badge-short { background: rgba(239, 68, 68, 0.18); color: #f87171; }
+    .badge-of { background: rgba(59, 130, 246, 0.18); color: #60a5fa; }
+    .badge-time { background: rgba(245, 158, 11, 0.18); color: #fbbf24; }
+    .progress-bar-bg {
+      width: 100%; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden; margin-top: 6px;
+    }
+    .progress-bar-fill { height: 100%; background: var(--bull); }
+    .hidden { display: none !important; }
+    .calc-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: #0d1422;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      margin-bottom: 10px;
+      font-size: 0.76rem;
+      flex-wrap: wrap;
+    }
+    .calc-bar input { width: 80px; padding: 4px 7px; }
+    .quick-pill {
+      background: #172236;
+      border: 1px solid #293b5c;
+      color: #93c5fd;
+      padding: 3px 8px;
+      border-radius: 5px;
+      font-size: 0.72rem;
+      cursor: pointer;
+    }
+    .quick-pill:hover { background: var(--accent); color: #fff; }
+    .remove-btn {
+      background: transparent;
+      border: none;
+      color: #64748b;
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 0 4px;
+    }
+    .remove-btn:hover { color: var(--bear); }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>
+        <span class="live-dot"></span>
+        MEXC Futures — 5m Order Block + Carmine Rosato Order Flow Bot
+      </h1>
+      <div class="subtitle">Live 5m Chart Visualizer • Market + Limit Retest Signal Tickets • Multi-Token Scanner & 7-Day Paper Trader</div>
+    </div>
+    <div class="tabs">
+      <button class="btn-warn" onclick="enableDesktopAlertsAndTest()">🔔 Enable Windows Popup & Test Sound</button>
+      <button class="tab-btn active" id="tabLiveBtn" onclick="switchTab('live')">Live Signals & 7-Day Paper Trader</button>
+      <button class="tab-btn" id="tabBacktestBtn" onclick="switchTab('backtest')">Historical Strategy Backtester</button>
+    </div>
+  </header>
+
+  <!-- TAB 1: LIVE SIGNALS & 7-DAY PAPER TRADER -->
+  <div id="liveView">
+    <!-- DUAL-ACCOUNT SIDE-BY-SIDE COMPARISON & SWITCHER (V2 SNIPER NEW vs V1 ONGOING) -->
+    <div id="dualAccountSwitcherBox" style="margin-bottom:12px;"></div>
+    <div class="kpi-grid" id="liveKpiGrid"></div>
+
+    <div class="main-grid">
+      <!-- LEFT COLUMN: LIVE MEXC 5M CHART + ORDER BLOCKS + FOOTPRINT -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <span class="card-title">Live 5m Chart + Auto-Drawn Order Blocks & VWAP</span>
+              <span id="chartSourceBadge" class="badge badge-of" style="margin-left:8px;">Loading...</span>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <select id="liveSymbolSelect" onchange="loadLiveChart()">
+                <option value="BTC_USDT">BTC_USDT (Perp)</option>
+                <option value="ETH_USDT">ETH_USDT (Perp)</option>
+                <option value="SOL_USDT">SOL_USDT (Perp)</option>
+                <option value="SUI_USDT">SUI_USDT (Perp)</option>
+              </select>
+              <button class="btn-primary" onclick="triggerScanNow()">Refresh / Scan Now</button>
+            </div>
+          </div>
+
+          <canvas id="mexcChartCanvas" width="900" height="370"></canvas>
+          <div style="font-size:0.73rem; color:var(--muted); margin: 4px 0 3px;">
+            5m Bar Volume Delta (Blue = Aggressive Buyers in Control • Red = Aggressive Sellers in Control)
+          </div>
+          <canvas id="deltaChartCanvas" width="900" height="95"></canvas>
+
+          <div style="font-size:0.75rem; color:var(--muted); margin-top:8px;">
+            Latest 5m Candle Footprint Profile (10 Price Bins — Bid Vol × Ask Vol & Net Delta):
+          </div>
+          <div class="footprint-box" id="footprintBox"></div>
+        </div>
+
+        <!-- OPEN PAPER POSITIONS -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Active Paper Positions (Live Tracking with TP1 Break-Even & TP2)</span>
+            <button class="btn-secondary" onclick="resetPaperAccount()" style="font-size:0.74rem;">Reset 7-Day Paper Account</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Opened Time & Duration</th>
+                  <th>Pair</th>
+                  <th>Side</th>
+                  <th>Entry Score</th>
+                  <th>5m OB</th>
+                  <th>Entry (Mkt / Lim)</th>
+                  <th>Current</th>
+                  <th>Stop Loss</th>
+                  <th>TP1 (1.5R)</th>
+                  <th>TP2 Target</th>
+                  <th>Order Flow Triggers</th>
+                  <th>Unrealized PnL</th>
+                </tr>
+              </thead>
+              <tbody id="openPositionsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: TOKEN MANAGER + PRE-SIGNAL RADAR + SIGNALS FEED -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">1. Pre-Signal Radar & Token Watchlist Manager</span>
+          </div>
+
+          <!-- ADD NEW TOKEN BAR -->
+          <div style="display:flex; gap:6px; margin-bottom:8px;">
+            <input type="text" id="newTokenInput" placeholder="Add token (e.g. XRP, DOGE, PEPE, AVAX)" style="flex:1;" onkeydown="if(event.key==='Enter') addCustomToken()" />
+            <button class="btn-primary" onclick="addCustomToken()">+ Add Token</button>
+          </div>
+          <div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; align-items:center;">
+            <span style="font-size:0.72rem; color:var(--muted);">Quick Add:</span>
+            <span class="quick-pill" onclick="addTokenByName('XRP_USDT')">+ XRP</span>
+            <span class="quick-pill" onclick="addTokenByName('DOGE_USDT')">+ DOGE</span>
+            <span class="quick-pill" onclick="addTokenByName('ADA_USDT')">+ ADA</span>
+            <span class="quick-pill" onclick="addTokenByName('AVAX_USDT')">+ AVAX</span>
+            <span class="quick-pill" onclick="addTokenByName('LINK_USDT')">+ LINK</span>
+            <span class="quick-pill" onclick="addTokenByName('BNB_USDT')">+ BNB</span>
+            <span class="quick-pill" onclick="addTokenByName('HYPE_USDT')">+ HYPE</span>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Pair</th>
+                <th>Live Price</th>
+                <th>OI Δ% / Spot CVD / Perp CVD</th>
+                <th>Closest 5m OB Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="radarTable"></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">2. 100-Point Confluence Scorecard & Confirmed Signals</span>
+            <label style="font-size:0.75rem; color:var(--muted); display:flex; align-items:center; gap:4px;">
+              <input type="checkbox" id="audioToggle" checked /> Sound Alarm
+            </label>
+          </div>
+
+          <!-- CONFLUENCE SCORECARD LEGEND & THRESHOLD SELECTOR -->
+          <div style="background:#0a0f1a; border:1px solid #1e2d47; border-radius:6px; padding:8px 10px; margin-bottom:8px; font-size:0.73rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
+              <span style="font-weight:700; color:#93c5fd;">🎯 Min Score Required to Take Trade:</span>
+              <select id="minScoreSelect" onchange="updateMinScoreThreshold(this.value)" style="padding:3px 8px; font-weight:700;">
+                <option value="60">60 / 100 (60+ Tier)</option>
+                <option value="65">65 / 100 (65+ Tier)</option>
+                <option value="70" selected>70 / 100 (70+ Tier — Active)</option>
+                <option value="75">75 / 100 (High A-Grade)</option>
+                <option value="80">80 / 100 (A+ Sniper Only)</option>
+              </select>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; color:var(--muted); font-size:0.68rem; border-top:1px solid #172236; padding-top:5px;">
+              <div><b style="color:#34d399;">Structure & Synergy</b><br/>+12 2nd-Touch / +10 FVG<br/>+22..28 Golden Combo<br/><span style="color:#f87171;">-20 Poor High/Low</span></div>
+              <div><b style="color:#60a5fa;">Carmine, OI & Spot/Perp CVD</b><br/>+15 Absorption / +12 OI+Spot Trap<br/>+8 Spot CVD Lead / +8 OI Flush<br/><span style="color:#f87171;">-12 Spot+Perp Breakout</span></div>
+              <div><b style="color:#c084fc;">Neil & Orochi Auction</b><br/>+20 nPOC / +15 80% VA<br/>+12 Sweep / +10 VWAP ±1.5σ<br/><span style="color:#f87171;">-15 POC Chop Filter</span></div>
+            </div>
+          </div>
+
+          <!-- REAL ACCOUNT RISK CALCULATOR -->
+          <div class="calc-bar">
+            <span style="color:var(--muted);">My Real MEXC Balance ($):</span>
+            <input type="number" id="realBalance" value="500" min="10" step="50" onchange="refreshLiveStatus()" />
+            <span style="color:var(--muted);">Risk / Trade (%):</span>
+            <input type="number" id="realRiskPct" value="1.0" min="0.1" max="10" step="0.5" onchange="refreshLiveStatus()" />
+          </div>
+
+          <div id="signalsFeedList" style="max-height: 430px; overflow-y: auto;"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">3. 🤖 Multi-Agent Bridge (Agent 1 ↔ Gemini 3.8 Co-Agent)</span>
+            <button class="btn-primary" style="font-size:0.72rem; padding:4px 9px;" onclick="copyClaudePrompt()">📋 Copy Prompt for Gemini 3.8</button>
+          </div>
+          <div style="font-size:0.75rem; color:var(--muted); margin-bottom:7px;">
+            My ID: <code style="color:#93c5fd;">ede03f66-932a-4372-a3e3-53fde077d75f</code><br/>
+            Peer Status: <span id="peerAgentStatus" class="warn">Waiting for Co-Agent to connect...</span>
+          </div>
+          <div id="agentBusMessages" style="max-height:150px; overflow-y:auto; background:#090d16; border:1px solid #1e293b; border-radius:6px; padding:8px; font-size:0.74rem;"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">4. Phone Push Alerts (Telegram Connected ✓)</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:7px; font-size:0.78rem;">
+            <input type="text" id="tgToken" value="9038672137:AAEMSStJO1S3B86JLeFYQ59nCplfrDYeEug" placeholder="Telegram Bot Token (from @BotFather)" />
+            <input type="text" id="tgChatId" value="1814239924" placeholder="Telegram Chat ID" />
+            <input type="text" id="discordWebhook" placeholder="Discord Webhook URL (optional)" />
+            <div style="display:flex; gap:6px;">
+              <button class="btn-primary" style="flex:1;" onclick="saveAlertSettings()">Save Alert Channels</button>
+              <button class="btn-secondary" style="flex:1;" onclick="sendTestTelegram()">📲 Send Test Telegram</button>
+            </div>
+            <div id="alertSaveStatus" style="color:var(--bull); font-size:0.75rem;">Telegram Bot & Chat ID (1814239924) Active ✓</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLOSED PAPER TRADES JOURNAL -->
+    <div class="card">
+      <div class="card-header" style="flex-wrap:wrap; gap:8px;">
+        <span class="card-title">7-Day Paper Trading Closed Trade Journal & Score Tier Win-Rate Tracker</span>
+        <div style="display:flex; align-items:center; gap:6px; font-size:0.75rem;">
+          <span style="color:var(--muted);">Filter Journal by Entry Score:</span>
+          <select id="journalScoreFilter" onchange="refreshLiveStatus()" style="padding:3px 8px; font-weight:600;">
+            <option value="ALL" selected>All Closed Trades</option>
+            <option value="GTE_60">Only &ge; 60 Points Trades</option>
+            <option value="GTE_70">Only &ge; 70 Points Trades</option>
+            <option value="GTE_80">Only &ge; 80 Points Trades</option>
+            <option value="B_60_69">60–69 Points Bracket Only</option>
+            <option value="B_70_79">70–79 Points Bracket Only</option>
+            <option value="B_80_PLUS">80+ Points Bracket Only</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- WIN RATE BY ENTRY SCORE TIER SUMMARY (60 PTS / 70 PTS / 80 PTS) -->
+      <div id="scoreTierSummaryBox" style="margin-bottom:12px;"></div>
+
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Entry Time</th>
+              <th>TP / SL Hit Time</th>
+              <th>Duration</th>
+              <th>Pair</th>
+              <th>Side</th>
+              <th>Entry Score</th>
+              <th>5m OB</th>
+              <th>Entry</th>
+              <th>Exit</th>
+              <th>Order Flow Triggers</th>
+              <th>Outcome</th>
+              <th>R-Mult</th>
+              <th>Realized PnL</th>
+            </tr>
+          </thead>
+          <tbody id="closedPaperTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: HISTORICAL BACKTESTER -->
+  <div id="backtestView" class="hidden">
+    <div class="card" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <div>
+        <label style="font-size:0.75rem; color:var(--muted); display:block;">Pair</label>
+        <select id="btSymbol">
+          <option value="BTC_USDT">BTC_USDT</option>
+          <option value="ETH_USDT">ETH_USDT</option>
+          <option value="SOL_USDT">SOL_USDT</option>
+          <option value="SUI_USDT">SUI_USDT</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.75rem; color:var(--muted); display:block;">Order Flow Mode</label>
+        <select id="btMinSignals">
+          <option value="2" selected>High-Confluence (>=2 OF Signals)</option>
+          <option value="1">Standard CLC (>=1 OF Signal)</option>
+          <option value="0">Blind 5m OB (No Order Flow)</option>
+        </select>
+      </div>
+      <button class="btn-primary" onclick="runHistoricalBacktest()" style="margin-top:16px;">Run Historical Backtest</button>
+    </div>
+    <div class="kpi-grid" id="btKpiGrid"></div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Historical Backtest Equity Curve ($ USDT)</span></div>
+      <canvas id="btEquityCanvas" width="900" height="260"></canvas>
+    </div>
+  </div>
+
+  <script>
+    let seenSignalIds = new Set();
+    let isFirstLoad = true;
+    let currentWatchedSymbols = [];
+
+    function switchTab(tab) {
+      document.getElementById('liveView').classList.toggle('hidden', tab !== 'live');
+      document.getElementById('backtestView').classList.toggle('hidden', tab !== 'backtest');
+      document.getElementById('tabLiveBtn').classList.toggle('active', tab === 'live');
+      document.getElementById('tabBacktestBtn').classList.toggle('active', tab === 'backtest');
+      if (tab === 'backtest') runHistoricalBacktest();
+    }
+
+    function selectPairChart(symbol) {
+      const sel = document.getElementById('liveSymbolSelect');
+      sel.value = symbol;
+      loadLiveChart();
+    }
+
+    async function addCustomToken() {
+      const input = document.getElementById('newTokenInput');
+      const val = input.value.trim();
+      if (!val) return;
+      input.value = '';
+      await addTokenByName(val);
+    }
+
+    async function addTokenByName(symbol) {
+      const res = await fetch('/api/live/symbols', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add', symbol }),
+      });
+      const json = await res.json();
+      if (json.ok && json.status) {
+        renderLiveStatus(json.status);
+        selectPairChart(json.symbol);
+      } else if (json.error) {
+        alert(json.error);
+      }
+    }
+
+    async function removeTokenByName(event, symbol) {
+      event.stopPropagation();
+      const res = await fetch('/api/live/symbols', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'remove', symbol }),
+      });
+      const json = await res.json();
+      if (json.ok && json.status) {
+        renderLiveStatus(json.status);
+      } else if (json.error) {
+        alert(json.error);
+      }
+    }
+
+    function syncSymbolDropdowns(symbols) {
+      if (!Array.isArray(symbols) || symbols.length === 0) return;
+      const key = symbols.join(',');
+      if (key === currentWatchedSymbols.join(',')) return;
+      currentWatchedSymbols = [...symbols];
+
+      const liveSel = document.getElementById('liveSymbolSelect');
+      const btSel = document.getElementById('btSymbol');
+      const prevLive = liveSel.value;
+      const prevBt = btSel.value;
+
+      liveSel.innerHTML = symbols.map(s => `<option value="${s}">${s} (Perp)</option>`).join('');
+      btSel.innerHTML = symbols.map(s => `<option value="${s}">${s}</option>`).join('');
+
+      if (symbols.includes(prevLive)) liveSel.value = prevLive;
+      if (symbols.includes(prevBt)) btSel.value = prevBt;
+    }
+
+    function playSignalChime() {
+      if (!document.getElementById('audioToggle')?.checked) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const notes = [659.25, 880, 1174.66];
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.14);
+          gain.gain.setValueAtTime(0.16, ctx.currentTime + idx * 0.14);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.14 + 0.35);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + idx * 0.14);
+          osc.stop(ctx.currentTime + idx * 0.14 + 0.35);
+        });
+      } catch {}
+    }
+
+    async function enableDesktopAlertsAndTest() {
+      playSignalChime();
+      if ('Notification' in window) {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          new Notification('MEXC 5m OB + Order Flow Bot Active', {
+            body: 'Desktop popup alerts and sound chime are enabled! You will be alerted whenever a new signal triggers.',
+          });
+        } else {
+          alert('Sound chime tested! (Enable browser notifications in site settings if you also want Windows desktop popups).');
+        }
+      }
+    }
+
+    function sendDesktopNotification(sig) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(`🚨 ${sig.symbol} ${sig.side} SIGNAL (Score ${sig.confluenceScore}/100)`, {
+          body: `Mkt Entry: ${sig.entryPrice} | Limit Entry: ${sig.limitEntryPrice || sig.entryPrice} | SL: ${sig.stopLoss} | TP1: ${sig.tp1Price} | TP2: ${sig.tp2Price}`,
+        });
+      }
+    }
+
+    function formatCandleAge(tsMs) {
+      const diffMin = Math.max(0, Math.round((Date.now() - tsMs) / 60000));
+      if (diffMin < 7) return '🔥 ACTIVE 5m BAR';
+      if (diffMin < 120) return `${diffMin}m ago`;
+      const hrs = (diffMin / 60).toFixed(1);
+      return `${hrs}h ago`;
+    }
+
+    function copyTicket(text) {
+      navigator.clipboard.writeText(text);
+    }
+
+    function copyClaudePrompt() {
+      const promptText = `Hi Gemini 3.8! You are our Co-Agent collaborating with the primary Trading Bot Agent (Conversation ID: ede03f66-932a-4372-a3e3-53fde077d75f) on our MEXC Futures 5m Order Block + Order Flow + Volume Profile bot.
+
+Please do these 2 steps right now to link with Agent 1:
+1. Use your \`send_message\` tool with \`Recipient: "ede03f66-932a-4372-a3e3-53fde077d75f"\` to introduce yourself and include your own Conversation ID so Agent 1 can message you directly.
+2. Read the live market & signal state from \`d:\\CRYPTO\\TRADING BOT\\ANTI GRAVITY\\5m Strategy\\data\\paper_trading_state.json\` (or \`GET http://localhost:3470/api/live/status\`) and register yourself on \`d:\\CRYPTO\\TRADING BOT\\ANTI GRAVITY\\5m Strategy\\data\\agent_bus.json\` (or \`POST http://localhost:3470/api/agent-bus\`) with:
+   \`{"action":"register","conversationId":"<YOUR_CONVERSATION_ID>","name":"Gemini 3.8 (HTF & Volume Profile Strategist)","role":"Co-Agent Signal Reviewer"}\``;
+      navigator.clipboard.writeText(promptText);
+      alert('Copied Gemini 3.8 Handshake Prompt to clipboard! Paste it into your Gemini 3.8 chat.');
+    }
+
+    async function refreshLiveStatus() {
+      const res = await fetch('/api/live/status');
+      const data = await res.json();
+      renderLiveStatus(data);
+      await loadLiveChart();
+    }
+
+    async function triggerScanNow() {
+      const res = await fetch('/api/live/scan-now', { method: 'POST' });
+      const data = await res.json();
+      renderLiveStatus(data);
+      await loadLiveChart();
+    }
+
+    async function updateMinScoreThreshold(minScore) {
+      const res = await fetch('/api/live/score-threshold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ minScore: Number(minScore) }),
+      });
+      const json = await res.json();
+      if (json.ok && json.status) {
+        renderLiveStatus(json.status);
+      }
+    }
+
+    async function resetPaperAccount() {
+      const res = await fetch('/api/live/reset', { method: 'POST' });
+      const data = await res.json();
+      renderLiveStatus(data);
+    }
+
+    async function saveAlertSettings() {
+      const telegramBotToken = document.getElementById('tgToken').value.trim();
+      const telegramChatId = document.getElementById('tgChatId').value.trim();
+      const discordWebhookUrl = document.getElementById('discordWebhook').value.trim();
+      await fetch('/api/live/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegramBotToken, telegramChatId, discordWebhookUrl }),
+      });
+      document.getElementById('alertSaveStatus').textContent = 'Saved! Future signals will push to your configured channels.';
+    }
+
+    async function sendTestTelegram() {
+      await saveAlertSettings();
+      document.getElementById('alertSaveStatus').textContent = 'Sending test message to Telegram...';
+      const res = await fetch('/api/live/test-telegram', { method: 'POST' });
+      const json = await res.json();
+      if (json.ok) {
+        document.getElementById('alertSaveStatus').textContent = '✅ Sent test message to your Telegram (ID: 1814239924)!';
+      } else {
+        document.getElementById('alertSaveStatus').textContent = `❌ Telegram error: ${json.error || 'Make sure you clicked /start in your bot chat first'}`;
+      }
+    }
+
+    let selectedAccountMode = 'V2';
+    let lastLiveStatusData = null;
+
+    function switchPaperAccountView(mode) {
+      selectedAccountMode = mode;
+      if (lastLiveStatusData) {
+        renderLiveStatus(lastLiveStatusData);
+      }
+    }
+
+    function renderLiveStatus(data) {
+      lastLiveStatusData = data;
+      syncSymbolDropdowns(data.watchedSymbols || []);
+      if (data.minScoreThreshold && document.getElementById('minScoreSelect')) {
+        document.getElementById('minScoreSelect').value = String(data.minScoreThreshold);
+      }
+
+      const v1Port = data.v1Portfolio || {
+        name: 'V1 Ongoing Baseline',
+        account: data.account,
+        openPositions: data.openPositions || [],
+        closedTrades: data.closedTrades || [],
+      };
+      const v2Port = data.v2Portfolio || {
+        name: 'V2 BTC-Compass Sniper (New)',
+        account: {
+          initialEquity: 10000,
+          realizedEquity: 10000,
+          liveEquity: 10000,
+          unrealizedPnlUsd: 0,
+          netPnlUsd: 0,
+          netReturnPct: 0,
+          maxDrawdownPct: 0,
+          closedTradesCount: 0,
+          winsCount: 0,
+          lossesCount: 0,
+          winRatePct: 0,
+          openPositionsCount: 0,
+        },
+        openPositions: [],
+        closedTrades: [],
+      };
+
+      const activePort = selectedAccountMode === 'V2' ? v2Port : v1Port;
+      const acc = activePort.account;
+      const camp = data.campaign;
+
+      // Render Side-by-Side Dual Account Switcher Cards
+      const dualBox = document.getElementById('dualAccountSwitcherBox');
+      if (dualBox) {
+        const a2 = v2Port.account;
+        const a1 = v1Port.account;
+        const isV2 = selectedAccountMode === 'V2';
+        dualBox.innerHTML = `
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:10px;">
+            <div onclick="switchPaperAccountView('V2')" style="cursor:pointer; background:${isV2 ? 'rgba(16,185,129,0.12)' : '#0f1624'}; border:2px solid ${isV2 ? '#10b981' : '#1e293b'}; border-radius:10px; padding:12px 14px; transition:0.15s;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span style="font-weight:800; font-size:0.88rem; color:#34d399;">🎯 ACCOUNT 2: V2 BTC-Compass Sniper (NEW)</span>
+                <span class="badge" style="background:${isV2 ? '#10b981' : '#1e293b'}; color:#fff; font-weight:700;">${isV2 ? '✓ VIEWING NOW' : 'Click to View'}</span>
+              </div>
+              <div style="font-size:0.72rem; color:var(--muted); margin-bottom:6px;">
+                Started Fresh Nov 9 ($10,000) • 4-Pillar BTC (EMA20+VWAP) • No Long/Short Mix • Max 2 Unhedged • Tournament Rank
+              </div>
+              <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:0.82rem;">
+                <div>Equity: <b class="${a2.netPnlUsd >= 0 ? 'pos' : 'neg'}">$${a2.liveEquity.toLocaleString()}</b> (${a2.netPnlUsd >= 0 ? '+' : ''}$${a2.netPnlUsd})</div>
+                <div>Win Rate: <b>${a2.winRatePct}%</b> (${a2.winsCount ?? 0}W / ${a2.lossesCount ?? 0}L)</div>
+                <div>Open: <b class="warn">${a2.openPositionsCount}</b></div>
+              </div>
+            </div>
+
+            <div onclick="switchPaperAccountView('V1')" style="cursor:pointer; background:${!isV2 ? 'rgba(59,130,246,0.12)' : '#0f1624'}; border:2px solid ${!isV2 ? '#3b82f6' : '#1e293b'}; border-radius:10px; padding:12px 14px; transition:0.15s;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span style="font-weight:800; font-size:0.88rem; color:#60a5fa;">📊 ACCOUNT 1: V1 Ongoing Baseline (Started Nov 6)</span>
+                <span class="badge" style="background:${!isV2 ? '#3b82f6' : '#1e293b'}; color:#fff; font-weight:700;">${!isV2 ? '✓ VIEWING NOW' : 'Click to View'}</span>
+              </div>
+              <div style="font-size:0.72rem; color:var(--muted); margin-bottom:6px;">
+                Continuing Original 7-Day Forward Test Uninterrupted (Takes all &ge;60p signals, 1 per symbol)
+              </div>
+              <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:0.82rem;">
+                <div>Equity: <b class="${a1.netPnlUsd >= 0 ? 'pos' : 'neg'}">$${a1.liveEquity.toLocaleString()}</b> (${a1.netPnlUsd >= 0 ? '+' : ''}$${a1.netPnlUsd})</div>
+                <div>Win Rate: <b>${a1.winRatePct}%</b> (${a1.closedTradesCount} trades)</div>
+                <div>Open: <b class="warn">${a1.openPositionsCount}</b></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      const acctLabel = selectedAccountMode === 'V2' ? 'V2 Sniper' : 'V1 Ongoing';
+      const kpis = [
+        {
+          label: `Active View (${acctLabel})`,
+          val: selectedAccountMode === 'V2' ? '🎯 V2 BTC Sniper' : '📊 V1 Ongoing',
+          extra: `<div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${Math.max(4, camp.progressPct)}%"></div></div>`,
+        },
+        { label: `${acctLabel} Live Equity`, val: `$${acc.liveEquity.toLocaleString()}`, cls: acc.netPnlUsd >= 0 ? 'pos' : 'neg' },
+        { label: `${acctLabel} Net PnL`, val: `${acc.netPnlUsd >= 0 ? '+' : ''}$${acc.netPnlUsd} (${acc.netReturnPct}%)`, cls: acc.netPnlUsd >= 0 ? 'pos' : 'neg' },
+        { label: `${acctLabel} Open Positions`, val: acc.openPositionsCount, cls: 'warn' },
+        { label: `${acctLabel} Win Rate`, val: `${acc.winRatePct}% (${acc.closedTradesCount} trades)`, cls: acc.winRatePct >= 50 ? 'pos' : '' },
+        { label: `${acctLabel} Max Drawdown`, val: `${acc.maxDrawdownPct}%`, cls: 'neg' },
+      ];
+
+      document.getElementById('liveKpiGrid').innerHTML = kpis.map(k => `
+        <div class="kpi-card">
+          <div class="kpi-label">${k.label}</div>
+          <div class="kpi-val ${k.cls || ''}">${k.val}</div>
+          ${k.extra || ''}
+        </div>
+      `).join('');
+
+      // 1. Pre-Signal Radar Table
+      document.getElementById('radarTable').innerHTML = (data.markets || []).map(m => {
+        const z = m.closestZone;
+        const basePtsBadge = z && z.obBaseScore ? `<span class="badge badge-of" title="OB Structure Base Score">${z.obBaseScore}/30p OB</span>` : '';
+        const zoneText = z
+          ? `<span class="badge ${z.type === 'BULLISH' ? 'badge-long' : 'badge-short'}">${z.type} OB</span> ${basePtsBadge} ${
+              z.inZone
+                ? `<b class="${(z.liveStatusText || '').startsWith('✅') ? 'pos' : 'warn'}">${z.liveStatusText || '🔥 IN OB ZONE NOW'}</b> <span style="color:var(--muted); font-size:0.72rem;">(${z.zoneLow}–${z.zoneHigh})</span>`
+                : `${z.distancePct}% away (${z.zoneLow}–${z.zoneHigh})`
+            }`
+          : 'None nearby';
+        const oiVal = typeof m.oiChangePct === 'number' ? m.oiChangePct : 0;
+        const spotPct = typeof m.latestSpotDeltaPct === 'number' ? m.latestSpotDeltaPct : m.latestDeltaPct;
+        const perpPct = typeof m.latestPerpDeltaPct === 'number' ? m.latestPerpDeltaPct : m.latestDeltaPct;
+        const oiCls = oiVal > 0 ? 'pos' : oiVal < 0 ? 'neg' : '';
+        const spotCls = spotPct >= 0 ? 'pos' : 'neg';
+        const perpCls = perpPct >= 0 ? 'pos' : 'neg';
+        return `
+          <tr style="cursor:pointer;" onclick="selectPairChart('${m.symbol}')" title="Click to view ${m.symbol} 5m chart">
+            <td><b>${m.symbol}</b></td>
+            <td><b>${m.lastPrice}</b></td>
+            <td style="font-size:0.74rem; line-height:1.35;">
+              <span class="${oiCls}" title="5m Open Interest Change %">OI: ${oiVal >= 0 ? '+' : ''}${oiVal.toFixed(2)}%</span> •
+              <span class="${spotCls}" title="Spot CVD Delta %">Spot: ${spotPct >= 0 ? '+' : ''}${spotPct}%</span> •
+              <span class="${perpCls}" title="Perpetuals CVD Delta %">Perp: ${perpPct >= 0 ? '+' : ''}${perpPct}%</span>
+            </td>
+            <td>${zoneText}</td>
+            <td><button class="remove-btn" title="Remove ${m.symbol}" onclick="removeTokenByName(event, '${m.symbol}')">×</button></td>
+          </tr>
+        `;
+      }).join('');
+
+      // 2. Confirmed Signals Feed with BOTH Market & Limit Retest Entry Tickets
+      const signals = data.signalsFeed || [];
+      for (const s of signals) {
+        if (!seenSignalIds.has(s.id)) {
+          seenSignalIds.add(s.id);
+          if (!isFirstLoad) {
+            playSignalChime();
+            sendDesktopNotification(s);
+          }
+        }
+      }
+      isFirstLoad = false;
+
+      const realBalance = Number(document.getElementById('realBalance')?.value || 500);
+      const realRiskPct = Number(document.getElementById('realRiskPct')?.value || 1.0);
+      const riskUsd = realBalance * (realRiskPct / 100);
+
+      document.getElementById('signalsFeedList').innerHTML = signals.length === 0
+        ? '<div style="color:var(--muted); font-size:0.8rem;">Scanning live 5m candles... When price enters a 5m OB and confirms Order Flow, a signal ticket will appear here with sound & popup alert.</div>'
+        : signals.slice(0, 15).map((s, idx) => {
+          const limPrice = s.limitEntryPrice || s.entryPrice;
+          const mktStopDist = Math.abs(s.entryPrice - s.stopLoss);
+          const limStopDist = Math.abs(limPrice - s.stopLoss);
+
+          const mktStopPct = s.entryPrice > 0 ? ((mktStopDist / s.entryPrice) * 100).toFixed(2) : '0.00';
+          const limStopPct = limPrice > 0 ? ((limStopDist / limPrice) * 100).toFixed(2) : '0.00';
+
+          const decimals = s.entryPrice < 2 ? 1 : 3;
+          const mktQty = mktStopDist > 0 ? (riskUsd / mktStopDist).toFixed(decimals) : 0;
+          const limQty = limStopDist > 0 ? (riskUsd / limStopDist).toFixed(decimals) : 0;
+
+          const coinName = s.symbol.split('_')[0];
+          const copyMkt = `${s.symbol} ${s.side} (MARKET) | Entry: ${s.entryPrice} | SL: ${s.stopLoss} | TP1: ${s.tp1Price} | TP2: ${s.tp2Price} | Size: ${mktQty} ${coinName}`;
+          const copyLim = `${s.symbol} ${s.side} (LIMIT RETEST) | Limit Entry: ${limPrice} | SL: ${s.stopLoss} | TP1: ${s.tp1Price} | TP2: ${s.tp2Price} | Size: ${limQty} ${coinName}`;
+
+          return `
+          <div class="signal-card ${s.side} ${idx === 0 ? 'fresh-signal' : ''}">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-weight:700; margin-bottom:4px;">
+              <span style="cursor:pointer;" onclick="selectPairChart('${s.symbol}')">
+                ${s.symbol} • <span class="${s.side === 'LONG' ? 'pos' : 'neg'}">${s.side}</span> (${s.orderBlockId}: ${s.obZoneLow}–${s.obZoneHigh})
+              </span>
+              <div>
+                <span class="badge badge-time">${formatCandleAge(s.timestamp)}</span>
+                <span class="badge badge-of">${s.grade || 'A-GRADE'} • ${s.confluenceScore}/100 pts</span>
+              </div>
+            </div>
+
+            <!-- DUAL ENTRY TICKET: MARKET VS OPTIMAL LIMIT RETEST -->
+            <div class="entry-grid">
+              <div class="entry-box">
+                <div style="color:var(--muted); font-size:0.7rem;">⚡ Market Entry (Immediate)</div>
+                <div style="font-size:0.92rem; font-weight:700; margin:2px 0;">${s.entryPrice} <span style="font-size:0.7rem; color:var(--muted);">(-${mktStopPct}% SL)</span></div>
+                <div style="color:#93c5fd; font-size:0.72rem;">Size: <b>${mktQty} ${coinName}</b> ($${riskUsd.toFixed(0)} risk)</div>
+                <button class="btn-secondary" style="margin-top:4px; width:100%; padding:3px; font-size:0.7rem;" onclick="copyTicket('${copyMkt}')">Copy Market Ticket</button>
+              </div>
+              <div class="entry-box limit-box">
+                <div style="color:#34d399; font-size:0.7rem;">🎯 Limit Retest (0% Fee • OB/POC)</div>
+                <div style="font-size:0.92rem; font-weight:700; color:#34d399; margin:2px 0;">${limPrice} <span style="font-size:0.7rem; color:var(--muted);">(-${limStopPct}% SL)</span></div>
+                <div style="color:#93c5fd; font-size:0.72rem;">Size: <b>${limQty} ${coinName}</b> (${s.limitRR || '3.2'}R to TP2)</div>
+                <button class="btn-secondary" style="margin-top:4px; width:100%; padding:3px; font-size:0.7rem;" onclick="copyTicket('${copyLim}')">Copy Limit Ticket</button>
+              </div>
+            </div>
+
+            <div style="color:#cbd5e1; margin:5px 0; font-size:0.76rem;">
+              🛑 SL: <b class="neg">${s.stopLoss}</b> &nbsp;|&nbsp;
+              💰 TP1 (${s.tp1Type || '1.8R'} + BE): <b class="pos">${s.tp1Price}</b> &nbsp;|&nbsp;
+              🚀 TP2 (${s.targetType || '3.2R'}): <b class="pos">${s.tp2Price}</b>
+            </div>
+            <div style="margin-top:4px;">
+              ${
+                Array.isArray(s.scoreBreakdown) && s.scoreBreakdown.length > 0
+                  ? s.scoreBreakdown
+                      .map(
+                        (item) =>
+                          `<span class="badge ${item.points < 0 ? 'badge-short' : 'badge-of'}" title="${item.label}">${item.points > 0 ? '+' : ''}${item.points}p ${item.code}</span>`
+                      )
+                      .join('')
+                  : (s.orderFlowSignals || []).map((t) => `<span class="badge badge-of">${t}</span>`).join('')
+              }
+            </div>
+            ${
+              s.claudeReview
+                ? `<div style="margin-top:6px; padding:6px 8px; border-radius:5px; font-size:0.74rem; background:${
+                    s.claudeReview.verdict === 'APPROVE'
+                      ? 'rgba(16,185,129,0.12)'
+                      : s.claudeReview.verdict === 'REJECT'
+                      ? 'rgba(239,68,68,0.12)'
+                      : 'rgba(245,158,11,0.12)'
+                  }; border:1px solid ${
+                    s.claudeReview.verdict === 'APPROVE'
+                      ? 'rgba(16,185,129,0.4)'
+                      : s.claudeReview.verdict === 'REJECT'
+                      ? 'rgba(239,68,68,0.4)'
+                      : 'rgba(245,158,11,0.4)'
+                  };">
+                    <b>🤖 Claude Verdict: ${s.claudeReview.verdict} (${s.claudeReview.confidence}% conf)</b><br/>
+                    <span style="color:#cbd5e1;">${s.claudeReview.reasoning}</span>
+                  </div>`
+                : `<div style="margin-top:5px; font-size:0.71rem; color:var(--muted);">🤖 Claude Co-Agent: Awaiting review on <code>/api/agent-bus</code></div>`
+            }
+          </div>
+        `;
+        }).join('');
+
+      // Render Multi-Agent Bridge Status & Messages
+      if (data.agentBus) {
+        const peer = data.agentBus.peerAgent;
+        const peerEl = document.getElementById('peerAgentStatus');
+        if (peerEl) {
+          if (peer) {
+            peerEl.className = 'pos';
+            peerEl.innerHTML = `<b>Connected — ${peer.name}</b> (<code>${peer.conversationId}</code>)`;
+          } else {
+            peerEl.className = 'warn';
+            peerEl.textContent = 'Waiting for Claude to connect...';
+          }
+        }
+        const msgBox = document.getElementById('agentBusMessages');
+        if (msgBox) {
+          const msgs = data.agentBus.messages || [];
+          msgBox.innerHTML = msgs.map(m => `
+            <div style="margin-bottom:6px; border-bottom:1px solid #162032; padding-bottom:4px;">
+              <span style="color:#60a5fa; font-weight:600;">${m.from}</span>
+              <span style="color:var(--muted); font-size:0.68rem;"> • ${new Date(m.timestamp).toLocaleTimeString()}</span><br/>
+              <span style="color:#e2e8f0;">${m.text}</span>
+            </div>
+          `).join('');
+        }
+      }
+
+      const fmtDateTime = (iso) => {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      };
+
+      const calcDur = (startIso, endIso) => {
+        if (!startIso) return '—';
+        const s = new Date(startIso).getTime();
+        const e = endIso ? new Date(endIso).getTime() : Date.now();
+        if (!Number.isFinite(s) || !Number.isFinite(e) || e < s) return '0m';
+        const sec = Math.floor((e - s) / 1000);
+        const d = Math.floor(sec / 86400);
+        const h = Math.floor((sec % 86400) / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const rs = sec % 60;
+        if (d > 0) return `${d}d ${h}h ${m}m`;
+        if (h > 0) return `${h}h ${m}m`;
+        if (m > 0) return `${m}m ${rs}s`;
+        return `${rs}s`;
+      };
+
+      const renderScoreBadge = (score) => {
+        const s = Number(score || 65);
+        if (s >= 80) {
+          return `<span class="badge" style="background:rgba(192,132,252,0.18); color:#e9d5ff; border:1px solid #a855f7; font-weight:700;">🎯 ${s} pts (80+ Tier)</span>`;
+        }
+        if (s >= 70) {
+          return `<span class="badge" style="background:rgba(16,185,129,0.16); color:#6ee7b7; border:1px solid #10b981; font-weight:700;">🎯 ${s} pts (70+ Tier)</span>`;
+        }
+        if (s >= 60) {
+          return `<span class="badge" style="background:rgba(59,130,246,0.16); color:#93c5fd; border:1px solid #3b82f6; font-weight:700;">🎯 ${s} pts (60+ Tier)</span>`;
+        }
+        return `<span class="badge badge-time">🎯 ${s} pts (&lt;60)</span>`;
+      };
+
+      // Open Paper Positions (for selected account: V2 Sniper or V1 Ongoing)
+      const openPos = activePort.openPositions || [];
+      document.getElementById('openPositionsTable').innerHTML = openPos.length === 0
+        ? `<tr><td colspan="12" style="color:var(--muted);">No open paper positions in <b>${acctLabel}</b> right now. Next confirmed signal will auto-enter.</td></tr>`
+        : openPos.map(p => `
+          <tr style="cursor:pointer;" onclick="selectPairChart('${p.symbol}')">
+            <td style="font-size:0.74rem; white-space:nowrap;">
+              <div>${fmtDateTime(p.openedAt)}</div>
+              <div style="color:#93c5fd; font-weight:600;">⏱️ ${p.durationText || calcDur(p.openedAt, null)} open</div>
+            </td>
+            <td><b>${p.symbol}</b></td>
+            <td><span class="badge ${p.side === 'LONG' ? 'badge-long' : 'badge-short'}">${p.side}</span></td>
+            <td>${renderScoreBadge(p.confluenceScore)}</td>
+            <td>${p.orderBlockId}</td>
+            <td><b>${p.entryPrice}</b> <span style="color:var(--muted); font-size:0.72rem;">(Lim: ${p.limitEntryPrice || p.entryPrice})</span></td>
+            <td><b>${p.currentPrice}</b></td>
+            <td class="neg">${p.currentStopLoss} ${p.tp1Hit ? '(BE)' : ''}</td>
+            <td class="pos">${p.tp1Price} ${p.tp1Hit ? '✓' : ''}</td>
+            <td class="pos">${p.tp2Price}</td>
+            <td>${(p.orderFlowSignals || []).map(x => `<span class="badge badge-of">${x}</span>`).join('')}</td>
+            <td class="${p.unrealizedPnlUsd >= 0 ? 'pos' : 'neg'}">
+              <b>${p.unrealizedPnlUsd >= 0 ? '+' : ''}$${p.unrealizedPnlUsd} (${p.unrealizedR >= 0 ? '+' : ''}${p.unrealizedR}R)</b>
+            </td>
+          </tr>
+        `).join('');
+
+      // Closed Paper Trades & Score Tier Win-Rate Summary (for selected account: V2 Sniper or V1 Ongoing)
+      const allClosed = activePort.closedTrades || [];
+      const makeStatRow = (label, list, accentColor) => {
+        const wins = list.filter(t => (t.realizedPnlUsd || 0) > 0);
+        const losses = list.length - wins.length;
+        const wr = list.length > 0 ? ((wins.length / list.length) * 100).toFixed(1) : '0.0';
+        const netPnl = list.reduce((acc, t) => acc + (t.realizedPnlUsd || 0), 0);
+        const avgR = list.length > 0 ? (list.reduce((acc, t) => acc + (t.rMultiple || 0), 0) / list.length).toFixed(2) : '0.00';
+        const avgSec = list.length > 0
+          ? Math.round(list.reduce((acc, t) => {
+              const s = new Date(t.openedAt).getTime();
+              const e = new Date(t.closedAt).getTime();
+              return acc + (Number.isFinite(s) && Number.isFinite(e) && e > s ? (e - s) / 1000 : 0);
+            }, 0) / list.length)
+          : 0;
+        const avgDur = avgSec >= 3600 ? `${Math.floor(avgSec / 3600)}h ${Math.floor((avgSec % 3600) / 60)}m` : `${Math.floor(avgSec / 60)}m`;
+        return `
+          <div style="background:#0a0f1a; border:1px solid #1e293b; border-left:3px solid ${accentColor}; border-radius:6px; padding:8px 10px;">
+            <div style="font-size:0.74rem; font-weight:700; color:${accentColor}; margin-bottom:4px;">${label}</div>
+            <div style="font-size:0.86rem; font-weight:700;">Win Rate: <span class="${Number(wr) >= 45 ? 'pos' : 'warn'}">${wr}%</span> <span style="font-size:0.73rem; color:var(--muted);">(${wins.length}W / ${losses}L of ${list.length})</span></div>
+            <div style="font-size:0.74rem; margin-top:2px;">
+              Net PnL: <b class="${netPnl >= 0 ? 'pos' : 'neg'}">${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)}</b> &nbsp;•&nbsp;
+              Avg R: <b>${Number(avgR) >= 0 ? '+' : ''}${avgR}R</b> &nbsp;•&nbsp;
+              Avg Duration: <b style="color:#93c5fd;">⏱️ ${avgDur}</b>
+            </div>
+          </div>
+        `;
+      };
+
+      const summaryEl = document.getElementById('scoreTierSummaryBox');
+      if (summaryEl) {
+        const gte60 = allClosed.filter(t => (t.confluenceScore || 0) >= 60);
+        const gte70 = allClosed.filter(t => (t.confluenceScore || 0) >= 70);
+        const gte80 = allClosed.filter(t => (t.confluenceScore || 0) >= 80);
+        const b60 = allClosed.filter(t => (t.confluenceScore || 0) >= 60 && (t.confluenceScore || 0) < 70);
+        const b70 = allClosed.filter(t => (t.confluenceScore || 0) >= 70 && (t.confluenceScore || 0) < 80);
+        const b80 = allClosed.filter(t => (t.confluenceScore || 0) >= 80);
+
+        summaryEl.innerHTML = `
+          <div style="font-size:0.72rem; color:var(--muted); margin-bottom:4px; font-weight:600;">📊 Cumulative Filter Comparison ("What if I only take &ge; 60, &ge; 70, or &ge; 80 Point Trades?"):</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:8px; margin-bottom:8px;">
+            ${makeStatRow('If Taking &ge; 60 Points Trades', gte60, '#3b82f6')}
+            ${makeStatRow('If Taking &ge; 70 Points Trades', gte70, '#10b981')}
+            ${makeStatRow('If Taking &ge; 80 Points Trades', gte80, '#a855f7')}
+          </div>
+          <div style="font-size:0.72rem; color:var(--muted); margin-bottom:4px; font-weight:600;">🎯 Individual Score Bracket Breakdown (60–69 pts vs 70–79 pts vs 80+ pts):</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:8px;">
+            ${makeStatRow('60–69 Points Bracket Only', b60, '#60a5fa')}
+            ${makeStatRow('70–79 Points Bracket Only', b70, '#34d399')}
+            ${makeStatRow('80+ Points Bracket Only', b80, '#c084fc')}
+          </div>
+        `;
+      }
+
+      const filterMode = document.getElementById('journalScoreFilter')?.value || 'ALL';
+      const closed = allClosed.filter(t => {
+        const s = Number(t.confluenceScore || 0);
+        if (filterMode === 'GTE_60') return s >= 60;
+        if (filterMode === 'GTE_70') return s >= 70;
+        if (filterMode === 'GTE_80') return s >= 80;
+        if (filterMode === 'B_60_69') return s >= 60 && s < 70;
+        if (filterMode === 'B_70_79') return s >= 70 && s < 80;
+        if (filterMode === 'B_80_PLUS') return s >= 80;
+        return true;
+      });
+
+      document.getElementById('closedPaperTable').innerHTML = closed.length === 0
+        ? '<tr><td colspan="13" style="color:var(--muted);">No closed paper trades match this score filter yet.</td></tr>'
+        : closed.map(t => `
+          <tr>
+            <td style="font-size:0.74rem; white-space:nowrap;">${fmtDateTime(t.openedAt)}</td>
+            <td style="font-size:0.74rem; white-space:nowrap;">${fmtDateTime(t.closedAt)}</td>
+            <td style="font-size:0.75rem; font-weight:700; color:#93c5fd; white-space:nowrap;">⏱️ ${t.durationText || calcDur(t.openedAt, t.closedAt)}</td>
+            <td><b>${t.symbol}</b></td>
+            <td><span class="badge ${t.side === 'LONG' ? 'badge-long' : 'badge-short'}">${t.side}</span></td>
+            <td>${renderScoreBadge(t.confluenceScore)}</td>
+            <td>${t.orderBlockId}</td>
+            <td>${t.entryPrice}</td>
+            <td>${t.exitPrice}</td>
+            <td>${(t.orderFlowSignals || []).map(x => `<span class="badge badge-of">${x}</span>`).join('')}</td>
+            <td>${t.exitReason}</td>
+            <td class="${t.rMultiple >= 0 ? 'pos' : 'neg'}">${t.rMultiple >= 0 ? '+' : ''}${t.rMultiple}R</td>
+            <td class="${t.realizedPnlUsd >= 0 ? 'pos' : 'neg'}"><b>${t.realizedPnlUsd >= 0 ? '+' : ''}$${t.realizedPnlUsd}</b></td>
+          </tr>
+        `).join('');
+    }
+
+    async function loadLiveChart() {
+      const symbol = document.getElementById('liveSymbolSelect').value;
+      const res = await fetch(`/api/live/chart?symbol=${encodeURIComponent(symbol)}`);
+      const chartData = await res.json();
+      if (!chartData || !chartData.candles) return;
+
+      document.getElementById('chartSourceBadge').textContent = `${chartData.symbol} • ${chartData.source} • Last: ${chartData.lastPrice} • Bias: ${chartData.trendBias}`;
+      drawCandlesAndOrderBlocks(chartData);
+      drawDeltaHistogram(chartData.candles);
+      renderFootprintInspector(chartData.candles[chartData.candles.length - 1]);
+    }
+
+    function drawCandlesAndOrderBlocks(chartData) {
+      const canvas = document.getElementById('mexcChartCanvas');
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const candles = chartData.candles.slice(-90);
+      if (candles.length === 0) return;
+
+      let minP = Math.min(...candles.map(c => c.low));
+      let maxP = Math.max(...candles.map(c => c.high));
+      const pad = (maxP - minP) * 0.08 || 1;
+      minP -= pad;
+      maxP += pad;
+
+      const yOf = (price) => h - 20 - ((price - minP) / (maxP - minP)) * (h - 40);
+      const xOf = (i) => 20 + (i / (candles.length - 1 || 1)) * (w - 95);
+
+      ctx.strokeStyle = '#151f30';
+      ctx.fillStyle = '#64748b';
+      ctx.font = '11px sans-serif';
+      for (let g = 0; g <= 5; g++) {
+        const p = minP + ((maxP - minP) * g) / 5;
+        const y = yOf(p);
+        ctx.beginPath();
+        ctx.moveTo(10, y);
+        ctx.lineTo(w - 70, y);
+        ctx.stroke();
+        ctx.fillText(p < 2 ? p.toFixed(4) : p.toFixed(2), w - 65, y + 4);
+      }
+
+      const firstBarIdx = candles[0].index;
+      for (const ob of chartData.orderBlocks || []) {
+        if (ob.zoneHigh < minP || ob.zoneLow > maxP) continue;
+        const startI = Math.max(0, ob.baseIndex - firstBarIdx);
+        const x1 = xOf(startI);
+        const x2 = w - 70;
+        const yTop = yOf(ob.zoneHigh);
+        const yBot = yOf(ob.zoneLow);
+
+        ctx.fillStyle = ob.type === 'BULLISH' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+        ctx.fillRect(x1, yTop, x2 - x1, Math.max(3, yBot - yTop));
+
+        ctx.strokeStyle = ob.type === 'BULLISH' ? 'rgba(16, 185, 129, 0.6)' : 'rgba(239, 68, 68, 0.6)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x1, yTop, x2 - x1, Math.max(3, yBot - yTop));
+      }
+
+      // 2. Draw Session VWAP Line (Gold) + Orochi ±1.5 SD Exhaustion Bands
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      candles.forEach((c, idx) => {
+        const x = xOf(idx);
+        const y = yOf(c.vwap);
+        if (idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      // Orochi VWAP +1.5 SD & -1.5 SD Bands
+      ctx.save();
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.42)';
+      ctx.lineWidth = 1.0;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      candles.forEach((c, idx) => {
+        const x = xOf(idx);
+        const y = yOf(c.vwapUpper15 || c.vwap);
+        if (idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      ctx.beginPath();
+      candles.forEach((c, idx) => {
+        const x = xOf(idx);
+        const y = yOf(c.vwapLower15 || c.vwap);
+        if (idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      ctx.restore();
+
+      // 2b. Draw Trader Neil & Orochi Volume Profile Levels (VAH, POC, VAL, Naked POC)
+      const lastC = candles[candles.length - 1];
+      if (lastC && lastC.vpPoc && lastC.vpVah && lastC.vpVal) {
+        const drawHorizLevel = (price, color, label, dashed = true) => {
+          if (price < minP || price > maxP) return;
+          const y = yOf(price);
+          ctx.save();
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.2;
+          if (dashed) ctx.setLineDash([5, 4]);
+          ctx.beginPath();
+          ctx.moveTo(20, y);
+          ctx.lineTo(w - 70, y);
+          ctx.stroke();
+          ctx.fillStyle = color;
+          ctx.font = 'bold 10px sans-serif';
+          ctx.fillText(label, 24, y - 4);
+          ctx.restore();
+        };
+        drawHorizLevel(lastC.vpVah, '#38bdf8', `VAH (${lastC.vpVah})`, true);
+        drawHorizLevel(lastC.vpPoc, '#a855f7', `VP POC (${lastC.vpPoc})`, false);
+        drawHorizLevel(lastC.vpVal, '#38bdf8', `VAL (${lastC.vpVal})`, true);
+        if (lastC.nakedPoc) {
+          drawHorizLevel(lastC.nakedPoc, '#fb923c', `Orochi nPOC (${lastC.nakedPoc})`, true);
+        }
+        if (lastC.ivWallUpper10) {
+          drawHorizLevel(lastC.ivWallUpper10, '#f43f5e', `ATrain Upper IV Wall (${lastC.ivWallUpper10})`, false);
+        }
+        if (lastC.ivWallLower10) {
+          drawHorizLevel(lastC.ivWallLower10, '#10b981', `ATrain Lower IV Wall (${lastC.ivWallLower10})`, false);
+        }
+      }
+
+      const barWidth = Math.max(3, Math.floor((w - 110) / candles.length) - 2);
+      candles.forEach((c, idx) => {
+        const x = xOf(idx);
+        const isBull = c.close >= c.open;
+        ctx.strokeStyle = isBull ? '#10b981' : '#ef4444';
+        ctx.fillStyle = isBull ? '#10b981' : '#ef4444';
+
+        ctx.beginPath();
+        ctx.moveTo(x, yOf(c.high));
+        ctx.lineTo(x, yOf(c.low));
+        ctx.stroke();
+
+        const yOpen = yOf(c.open);
+        const yClose = yOf(c.close);
+        const top = Math.min(yOpen, yClose);
+        const height = Math.max(2, Math.abs(yClose - yOpen));
+        ctx.fillRect(x - barWidth / 2, top, barWidth, height);
+
+        if (c.pocPrice) {
+          ctx.fillStyle = '#e2e8f0';
+          ctx.fillRect(x - 1, yOf(c.pocPrice) - 1, 2, 2);
+        }
+      });
+    }
+
+    function drawDeltaHistogram(allCandles) {
+      const canvas = document.getElementById('deltaChartCanvas');
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const candles = allCandles.slice(-90);
+      if (candles.length === 0) return;
+
+      const maxAbsDelta = Math.max(...candles.map(c => Math.abs(c.delta || 1)), 1);
+      const midY = h / 2;
+
+      ctx.strokeStyle = '#24324b';
+      ctx.beginPath();
+      ctx.moveTo(10, midY);
+      ctx.lineTo(w - 70, midY);
+      ctx.stroke();
+
+      const xOf = (i) => 20 + (i / (candles.length - 1 || 1)) * (w - 95);
+      const barWidth = Math.max(3, Math.floor((w - 110) / candles.length) - 2);
+
+      candles.forEach((c, idx) => {
+        const x = xOf(idx);
+        const barH = (Math.abs(c.delta) / maxAbsDelta) * (h / 2 - 8);
+        ctx.fillStyle = c.delta >= 0 ? '#3b82f6' : '#ef4444';
+        if (c.delta >= 0) {
+          ctx.fillRect(x - barWidth / 2, midY - barH, barWidth, Math.max(2, barH));
+        } else {
+          ctx.fillRect(x - barWidth / 2, midY, barWidth, Math.max(2, barH));
+        }
+      });
+    }
+
+    function renderFootprintInspector(latestCandle) {
+      const box = document.getElementById('footprintBox');
+      if (!latestCandle || !latestCandle.footprintBins) return;
+      box.innerHTML = latestCandle.footprintBins.map(b => `
+        <div class="fp-cell" style="border: 1px solid ${b.delta >= 0 ? 'rgba(59,130,246,0.4)' : 'rgba(239,68,68,0.4)'}">
+          <div style="color:var(--muted);">${b.priceMid}</div>
+          <div><span class="neg">${b.bidVol}</span> × <span class="pos">${b.askVol}</span></div>
+          <div class="${b.delta >= 0 ? 'pos' : 'neg'}" style="font-weight:700;">Δ ${b.delta >= 0 ? '+' : ''}${b.delta}</div>
+        </div>
+      `).join('');
+    }
+
+    async function runHistoricalBacktest() {
+      const symbol = document.getElementById('btSymbol').value;
+      const minSignals = Number(document.getElementById('btMinSignals').value);
+      const res = await fetch('/api/run-backtest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol,
+          requireOrderFlowConfirmation: minSignals > 0,
+          minOrderFlowSignals: minSignals,
+          minTotalConfluenceScore: minSignals === 0 ? 0 : 58,
+        }),
+      });
+      const data = await res.json();
+      const s = data.summary;
+      document.getElementById('btKpiGrid').innerHTML = [
+        { label: 'Net Return', val: `${s.netReturnPct >= 0 ? '+' : ''}${s.netReturnPct}%`, cls: s.netReturnPct >= 0 ? 'pos' : 'neg' },
+        { label: 'Final Equity', val: `$${s.finalEquity.toLocaleString()}`, cls: s.netPnlUsd >= 0 ? 'pos' : 'neg' },
+        { label: 'Win Rate', val: `${s.winRatePct}% (${s.winningTrades}/${s.totalTrades})`, cls: s.winRatePct >= 50 ? 'pos' : '' },
+        { label: 'Profit Factor', val: s.profitFactor, cls: s.profitFactor >= 1.5 ? 'pos' : '' },
+        { label: 'Expectancy', val: `${s.expectancyR >= 0 ? '+' : ''}${s.expectancyR}R`, cls: s.expectancyR >= 0 ? 'pos' : 'neg' },
+        { label: 'Max Drawdown', val: `${s.maxDrawdownPct}%`, cls: 'neg' },
+      ].map(k => `<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-val ${k.cls}">${k.val}</div></div>`).join('');
+
+      const canvas = document.getElementById('btEquityCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const curve = data.equityCurve || [];
+      if (curve.length < 2) return;
+      const vals = curve.map(p => p.equity);
+      const minV = Math.min(...vals) * 0.99;
+      const maxV = Math.max(...vals) * 1.01;
+      ctx.strokeStyle = vals[vals.length - 1] >= vals[0] ? '#10b981' : '#ef4444';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      curve.forEach((pt, idx) => {
+        const x = 20 + (idx / (curve.length - 1)) * (canvas.width - 40);
+        const y = canvas.height - 20 - ((pt.equity - minV) / (maxV - minV || 1)) * (canvas.height - 40);
+        if (idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+
+    refreshLiveStatus();
+    setInterval(refreshLiveStatus, 10000);
+  </script>
+</body>
+</html>
