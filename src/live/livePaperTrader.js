@@ -676,6 +676,11 @@ export class LivePaperTrader {
     const v2 = this.state.v2Account;
     if (!v2) return { allowed: false, reason: 'V2_NOT_INITIALIZED' };
 
+    // 0. Hard-Lock Copilot SKIP Rejection
+    if (sig.claudeReview && sig.claudeReview.verdict === 'SKIP') {
+      return { allowed: false, reason: 'COPILOT_SKIP_REJECTED' };
+    }
+
     const targetSym = symbol || sig.symbol;
     const minFloor = Math.max(70, this.state.minScoreThreshold || 70);
     if ((sig.confluenceScore || 0) < minFloor) {
@@ -684,6 +689,18 @@ export class LivePaperTrader {
 
     if (v2.openPositions.some((p) => p.symbol === targetSym)) {
       return { allowed: false, reason: 'ALREADY_OPEN_ON_SYMBOL_V2' };
+    }
+
+    // 25-minute Post-Stop-Loss Cooldown Guard (prevents catching falling knives)
+    const closedV2 = v2.closedTrades || [];
+    const recentStopLoss = closedV2.some(
+      (t) => t.symbol === targetSym &&
+             t.side === sig.side &&
+             t.exitReason === 'STOP_LOSS' &&
+             (Date.now() - new Date(t.closedAt).getTime() < 25 * 60 * 1000)
+    );
+    if (recentStopLoss) {
+      return { allowed: false, reason: 'POST_STOP_LOSS_25M_COOLDOWN' };
     }
 
     const btcGuard = this._evaluateBtcMacroGuard(targetSym, sig.side);
@@ -788,7 +805,7 @@ export class LivePaperTrader {
       confidence += 8;
       reasons.push('1H trend aligned');
     } else {
-      confidence -= 6;
+      confidence -= 16;
       reasons.push('Counter-1H trend (take 50% at TP1)');
     }
 
@@ -817,16 +834,22 @@ export class LivePaperTrader {
       reasons.push(goldenItem.label);
     }
 
-    // Check 3: BTC Market Leader Correlation
+    // Check 3: BTC Market Leader Correlation & Macro Guard
     const btcMarket = this.marketCache['BTC_USDT'];
     if (btcMarket && symbol !== 'BTC_USDT') {
-      const btcBull = btcMarket.latestDelta >= 0 || btcMarket.trendBias === 'BULLISH';
-      if ((sig.side === 'LONG' && btcBull) || (sig.side === 'SHORT' && !btcBull)) {
-        confidence += 5;
-        reasons.push('BTC flow supportive');
+      const btcGuard = this._evaluateBtcMacroGuard(symbol, sig.side);
+      if (!btcGuard.allowed) {
+        confidence -= 25;
+        reasons.push(`BTC Guard Warning: ${btcGuard.reason}`);
       } else {
-        confidence -= 7;
-        reasons.push('BTC delta diverging');
+        const btcBull = btcMarket.latestDelta >= 0 || btcMarket.trendBias === 'BULLISH';
+        if ((sig.side === 'LONG' && btcBull) || (sig.side === 'SHORT' && !btcBull)) {
+          confidence += 5;
+          reasons.push('BTC flow supportive');
+        } else {
+          confidence -= 8;
+          reasons.push('BTC delta diverging');
+        }
       }
     }
 
@@ -1139,6 +1162,11 @@ export class LivePaperTrader {
       const minFloor = Math.max(70, this.state.minScoreThreshold || 70);
       if ((sig.confluenceScore || 0) < minFloor) continue;
 
+      // 1. HARD-LOCK COPILOT SKIP GATE: Never enter any trade where Copilot issues a SKIP (<58% confidence)
+      if (coAgentReview && coAgentReview.verdict === 'SKIP') {
+        continue;
+      }
+
       const canOpenV1 = !this.state.openPositions.some((p) => p.symbol === symbol);
       const v2Gate = this._canOpenV2PortfolioPosition(symbol, sig);
       const canOpenV2 = v2Gate.allowed;
@@ -1261,9 +1289,29 @@ export class LivePaperTrader {
       return null;
     }
     const equity = targetAccount.currentEquity;
-    const riskUsd = equity * (this.state.riskPerTradePct || 0.01);
+
+    // Copilot Dynamic Risk Allocation:
+    // APPROVE (>=72% confidence) -> Standard full risk (1.0%)
+    // CAUTION (58-71% confidence) -> Tight half risk (0.5%)
+    const isCaution = sig.claudeReview?.verdict === 'CAUTION';
+    const baseRiskPct = this.state.riskPerTradePct || 0.01;
+    const effectiveRiskPct = isCaution ? baseRiskPct * 0.5 : baseRiskPct;
+    const riskUsd = equity * effectiveRiskPct;
+
     const stopDistance = Math.abs(sig.entryPrice - sig.stopLoss);
     if (stopDistance <= 0) return null;
+
+    // Stop Loss Proximity Guard: Never open a position if live price is already touching or past Stop Loss
+    const liveMarket = this.marketCache[sig.symbol];
+    const livePrice = liveMarket ? liveMarket.lastPrice : sig.entryPrice;
+    if (sig.side === 'LONG' && livePrice <= sig.stopLoss * 1.002) {
+      console.warn(`[${accountTag}] Aborted opening ${sig.symbol} LONG: Live price ($${livePrice}) already near/below Stop Loss ($${sig.stopLoss})`);
+      return null;
+    }
+    if (sig.side === 'SHORT' && livePrice >= sig.stopLoss * 0.998) {
+      console.warn(`[${accountTag}] Aborted opening ${sig.symbol} SHORT: Live price ($${livePrice}) already near/above Stop Loss ($${sig.stopLoss})`);
+      return null;
+    }
 
     let qty = riskUsd / stopDistance;
     const maxNotional = equity * (this.state.maxLeverage || 10);
@@ -1290,6 +1338,9 @@ export class LivePaperTrader {
       tp1Price: sig.tp1Price,
       tp2Price: sig.tp2Price,
       targetType: sig.targetType,
+      isCaution,
+      copilotVerdict: sig.claudeReview?.verdict || 'APPROVE',
+      movedToBeAt1R: false,
       initialQty: Number(qty.toFixed(6)),
       remainingQty: Number(qty.toFixed(6)),
       notionalUsd: Number((qty * sig.entryPrice).toFixed(2)),
@@ -1346,6 +1397,15 @@ export class LivePaperTrader {
           pos.exitReason = pos.tp1Hit ? 'TP1_THEN_BREAKEVEN' : 'STOP_LOSS';
           pos.remainingQty = 0;
         } else {
+          // Copilot CAUTION Protection: Move Stop Loss to Breakeven early at +1.0R
+          if (pos.isCaution && !pos.movedToBeAt1R && !pos.tp1Hit) {
+            const riskDist = Math.abs(pos.entryPrice - pos.initialStopLoss);
+            if (riskDist > 0 && (checkHigh - pos.entryPrice) >= riskDist * 1.0) {
+              pos.currentStopLoss = this._formatPrice(pos.entryPrice * 1.0004);
+              pos.movedToBeAt1R = true;
+            }
+          }
+
           if (!pos.tp1Hit && checkHigh >= pos.tp1Price) {
             const closeQty = pos.initialQty * 0.5;
             const pnl1 = (pos.tp1Price - pos.entryPrice) * closeQty;
@@ -1380,6 +1440,15 @@ export class LivePaperTrader {
           pos.exitReason = pos.tp1Hit ? 'TP1_THEN_BREAKEVEN' : 'STOP_LOSS';
           pos.remainingQty = 0;
         } else {
+          // Copilot CAUTION Protection: Move Stop Loss to Breakeven early at +1.0R
+          if (pos.isCaution && !pos.movedToBeAt1R && !pos.tp1Hit) {
+            const riskDist = Math.abs(pos.initialStopLoss - pos.entryPrice);
+            if (riskDist > 0 && (pos.entryPrice - checkLow) >= riskDist * 1.0) {
+              pos.currentStopLoss = this._formatPrice(pos.entryPrice * 0.9996);
+              pos.movedToBeAt1R = true;
+            }
+          }
+
           if (!pos.tp1Hit && checkLow <= pos.tp1Price) {
             const closeQty = pos.initialQty * 0.5;
             const pnl1 = (pos.entryPrice - pos.tp1Price) * closeQty;

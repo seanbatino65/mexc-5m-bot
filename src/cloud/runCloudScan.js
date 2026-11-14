@@ -12,7 +12,7 @@ import { LivePaperTrader } from '../live/livePaperTrader.js';
 const loopMinutes = Number(process.env.CLOUD_LOOP_MINUTES || 4);
 const intervalMs = 15000;
 const iterations = Math.max(1, Math.floor((loopMinutes * 60 * 1000) / intervalMs));
-const renderUrl = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || '';
+const renderUrl = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || 'https://mexc-5m-bot.onrender.com';
 
 const trader = new LivePaperTrader({
   symbols: [
