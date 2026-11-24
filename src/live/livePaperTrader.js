@@ -491,7 +491,7 @@ export class LivePaperTrader {
   _loadAlertConfig() {
     const envToken = process.env.TELEGRAM_BOT_TOKEN || '';
     const envChatId = process.env.TELEGRAM_CHAT_ID || '';
-    const defaultToken = envToken || '9292265815:AAEkGJPEpPZBb2e0sDOvaOWr0GKI_i2bUrA';
+    const defaultToken = envToken;
     const defaultChatId = envChatId || '1814239924';
     if (fs.existsSync(CONFIG_FILE)) {
       try {
