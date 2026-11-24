@@ -489,14 +489,16 @@ export class LivePaperTrader {
   }
 
   _loadAlertConfig() {
-    const defaultToken = process.env.TELEGRAM_BOT_TOKEN || '9038672137:AAEMSStJO1S3B86JLeFYQ59nCplfrDYeEug';
-    const defaultChatId = process.env.TELEGRAM_CHAT_ID || '1814239924';
+    const envToken = process.env.TELEGRAM_BOT_TOKEN || '';
+    const envChatId = process.env.TELEGRAM_CHAT_ID || '';
+    const defaultToken = envToken || '9292265815:AAEkGJPEpPZBb2e0sDOvaOWr0GKI_i2bUrA';
+    const defaultChatId = envChatId || '1814239924';
     if (fs.existsSync(CONFIG_FILE)) {
       try {
         const saved = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
         return {
-          telegramBotToken: saved.telegramBotToken || defaultToken,
-          telegramChatId: saved.telegramChatId || defaultChatId,
+          telegramBotToken: envToken || saved.telegramBotToken || defaultToken,
+          telegramChatId: envChatId || saved.telegramChatId || defaultChatId,
           discordWebhookUrl: saved.discordWebhookUrl || process.env.DISCORD_WEBHOOK_URL || '',
           enableSoundAlert: saved.enableSoundAlert ?? true,
         };
@@ -1783,8 +1785,8 @@ export class LivePaperTrader {
         : sig.orderFlowSignals.map(clean).join(' + ');
 
     const acctHeader = sig.enteredV2
-      ? `🎯 *ACCOUNT: V2 SNIPER (NEW) + V1 ONGOING*`
-      : `📊 *ACCOUNT: V1 ONGOING ONLY (Skipped on V2: ${clean(sig.v2GateReason)})*`;
+      ? `🎯 *ACCOUNT 2: STRAT 2 — 15m SNIPER (PROPR 5K)*`
+      : `🎯 *ACCOUNT 1: STRAT 1 — 5m SNIPER (PROPR 5K)*`;
 
     const coVerdict = sig.claudeReview
       ? `\n🤖 *Co-Agent Verdict:* ${clean(sig.claudeReview.verdict)} (${sig.claudeReview.confidence}%)\n_${clean(sig.claudeReview.reasoning)}_`
@@ -1829,7 +1831,7 @@ export class LivePaperTrader {
       .join('\n');
 
     const text =
-      `✅ *Hyperliquid (PROPR) 5m Dual-Account Bot Connected (V1 Ongoing + V2 BTC-Compass Sniper)!*\n\n` +
+      `✅ *Hyperliquid (PROPR 5K) Dual-Timeframe Sniper Connected (Acct 1: 5m + Acct 2: 15m)!*\n\n` +
       `🎯 *Min Confluence Score:* \`${this.state.minScoreThreshold || 60}/100 pts\`\n` +
       `📡 *Active Watched Markets (${this.symbols.length}):*\n${marketsList}`;
 
