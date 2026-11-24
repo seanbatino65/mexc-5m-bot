@@ -43,7 +43,7 @@ if (process.platform === 'win32') {
 
 const fetcher = new MexcDataFetcher();
 const liveTrader = new LivePaperTrader({
-  symbols: ['BTC_USDT', 'ETH_USDT', 'SOL_USDT', 'SUI_USDT'],
+  symbols: ['BTC_USDC', 'ETH_USDC', 'SOL_USDC', 'SUI_USDC', 'HYPE_USDC', 'PUMP_USDC', 'DOGE_USDC'],
   pollIntervalMs: 8000,
 });
 
@@ -83,13 +83,15 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // 2. Live MEXC 15m Chart + Order Blocks + Footprint Data for a Symbol
+    // 2. Live Hyperliquid 5m / 15m Chart + Order Blocks + Footprint Data for a Symbol
     if (req.method === 'GET' && url.pathname === '/api/live/chart') {
-      const symbol = url.searchParams.get('symbol') || 'BTC_USDT';
-      if (!liveTrader.marketCache[symbol]) {
+      const symbol = liveTrader.normalizeSymbol(url.searchParams.get('symbol') || 'BTC_USDC');
+      const tf = url.searchParams.get('tf') === '15m' ? '15m' : '5m';
+      const cache = tf === '15m' ? liveTrader.marketCache15m : liveTrader.marketCache;
+      if (!cache[symbol]) {
         await liveTrader.scanSymbol(symbol);
       }
-      const chartData = liveTrader.marketCache[symbol] || { error: 'No chart data available' };
+      const chartData = cache[symbol] || liveTrader.marketCache[symbol] || { error: 'No chart data available' };
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(chartData));
       return;
@@ -172,12 +174,36 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // 5. Reset 7-Day Paper Trading Account
+    // 5. Reset 7-Day Paper Trading Account (PROPR 5K Mode)
     if (req.method === 'POST' && url.pathname === '/api/live/reset') {
-      liveTrader.resetPaperAccount(10000);
+      liveTrader.resetPaperAccount(5000);
       await liveTrader.scanAllSymbols();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(liveTrader.getStatusSnapshot()));
+      return;
+    }
+
+    // 5b. PROPR Auto-Trader Status, Config & Connection Test
+    if (req.method === 'GET' && url.pathname === '/api/propr/status') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(liveTrader.proprTrader.getPublicStatus()));
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/propr/config') {
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      const cfg = body ? JSON.parse(body) : {};
+      const status = liveTrader.proprTrader.saveConfig(cfg);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, propr: status }));
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/propr/test') {
+      const testRes = await liveTrader.proprTrader.testConnection();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(testRes));
       return;
     }
 
@@ -287,7 +313,7 @@ server.on('error', (err) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`MEXC 5m Order Block + Order Flow Live Command Center running at http://localhost:${PORT}`);
+  console.log(`Hyperliquid (PROPR) 5m Order Block + Order Flow Live Command Center running at http://localhost:${PORT}`);
 
   // 24/7 Cloud Keep-Alive Self-Ping (prevents Render / Koyeb free tier from sleeping after 15m)
   const externalUrl = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL;

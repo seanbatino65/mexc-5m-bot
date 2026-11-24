@@ -235,9 +235,9 @@
     <div>
       <h1>
         <span class="live-dot"></span>
-        MEXC Futures — 5m Order Block + Carmine Rosato Order Flow Bot
+        Hyperliquid (PROPR) — 5m Order Block + Carmine Rosato Order Flow Bot
       </h1>
-      <div class="subtitle">Live 5m Chart Visualizer • Market + Limit Retest Signal Tickets • Multi-Token Scanner & 7-Day Paper Trader</div>
+      <div class="subtitle">Live Hyperliquid Mainnet 5m Chart • PROPR 5K Risk Tickets • Multi-Token Scanner & 7-Day Paper Trader</div>
     </div>
     <div class="tabs">
       <button class="btn-warn" onclick="enableDesktopAlertsAndTest()">🔔 Enable Windows Popup & Test Sound</button>
@@ -263,10 +263,13 @@
             </div>
             <div style="display:flex; gap:8px; align-items:center;">
               <select id="liveSymbolSelect" onchange="loadLiveChart()">
-                <option value="BTC_USDT">BTC_USDT (Perp)</option>
-                <option value="ETH_USDT">ETH_USDT (Perp)</option>
-                <option value="SOL_USDT">SOL_USDT (Perp)</option>
-                <option value="SUI_USDT">SUI_USDT (Perp)</option>
+                <option value="BTC_USDC">BTC_USDC (Hyperliquid)</option>
+                <option value="ETH_USDC">ETH_USDC (Hyperliquid)</option>
+                <option value="SOL_USDC">SOL_USDC (Hyperliquid)</option>
+                <option value="SUI_USDC">SUI_USDC (Hyperliquid)</option>
+                <option value="PUMP_USDC">PUMP_USDC (Hyperliquid)</option>
+                <option value="HYPE_USDC">HYPE_USDC (Hyperliquid)</option>
+                <option value="DOGE_USDC">DOGE_USDC (Hyperliquid)</option>
               </select>
               <button class="btn-primary" onclick="triggerScanNow()">Refresh / Scan Now</button>
             </div>
@@ -328,13 +331,14 @@
           </div>
           <div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; align-items:center;">
             <span style="font-size:0.72rem; color:var(--muted);">Quick Add:</span>
-            <span class="quick-pill" onclick="addTokenByName('XRP_USDT')">+ XRP</span>
-            <span class="quick-pill" onclick="addTokenByName('DOGE_USDT')">+ DOGE</span>
-            <span class="quick-pill" onclick="addTokenByName('ADA_USDT')">+ ADA</span>
-            <span class="quick-pill" onclick="addTokenByName('AVAX_USDT')">+ AVAX</span>
-            <span class="quick-pill" onclick="addTokenByName('LINK_USDT')">+ LINK</span>
-            <span class="quick-pill" onclick="addTokenByName('BNB_USDT')">+ BNB</span>
-            <span class="quick-pill" onclick="addTokenByName('HYPE_USDT')">+ HYPE</span>
+            <span class="quick-pill" onclick="addTokenByName('PUMP_USDC')">+ PUMP</span>
+            <span class="quick-pill" onclick="addTokenByName('DOGE_USDC')">+ DOGE</span>
+            <span class="quick-pill" onclick="addTokenByName('HYPE_USDC')">+ HYPE</span>
+            <span class="quick-pill" onclick="addTokenByName('XRP_USDC')">+ XRP</span>
+            <span class="quick-pill" onclick="addTokenByName('AVAX_USDC')">+ AVAX</span>
+            <span class="quick-pill" onclick="addTokenByName('LINK_USDC')">+ LINK</span>
+            <span class="quick-pill" onclick="addTokenByName('PEPE_USDC')">+ PEPE</span>
+            <span class="quick-pill" onclick="addTokenByName('BNB_USDC')">+ BNB</span>
           </div>
 
           <table>
@@ -380,10 +384,10 @@
 
           <!-- REAL ACCOUNT RISK CALCULATOR -->
           <div class="calc-bar">
-            <span style="color:var(--muted);">My Real MEXC Balance ($):</span>
-            <input type="number" id="realBalance" value="500" min="10" step="50" onchange="refreshLiveStatus()" />
+            <span style="color:var(--muted);">My PROPR Balance ($):</span>
+            <input type="number" id="realBalance" value="5000" min="10" step="100" onchange="refreshLiveStatus()" />
             <span style="color:var(--muted);">Risk / Trade (%):</span>
-            <input type="number" id="realRiskPct" value="1.0" min="0.1" max="10" step="0.5" onchange="refreshLiveStatus()" />
+            <input type="number" id="realRiskPct" value="0.3" min="0.1" max="10" step="0.1" onchange="refreshLiveStatus()" />
           </div>
 
           <div id="signalsFeedList" style="max-height: 430px; overflow-y: auto;"></div>
@@ -406,7 +410,7 @@
             <span class="card-title">4. Phone Push Alerts (Telegram Connected ✓)</span>
           </div>
           <div style="display:flex; flex-direction:column; gap:7px; font-size:0.78rem;">
-            <input type="text" id="tgToken" value="9038672137:AAEMSStJO1S3B86JLeFYQ59nCplfrDYeEug" placeholder="Telegram Bot Token (from @BotFather)" />
+            <input type="text" id="tgToken" value="9292265815:AAEkGJPEpPZBb2e0sDOvaOWr0GKI_i2bUrA" placeholder="Telegram Bot Token (from @BotFather)" />
             <input type="text" id="tgChatId" value="1814239924" placeholder="Telegram Chat ID" />
             <input type="text" id="discordWebhook" placeholder="Discord Webhook URL (optional)" />
             <div style="display:flex; gap:6px;">
@@ -414,6 +418,36 @@
               <button class="btn-secondary" style="flex:1;" onclick="sendTestTelegram()">📲 Send Test Telegram</button>
             </div>
             <div id="alertSaveStatus" style="color:var(--bull); font-size:0.75rem;">Telegram Bot & Chat ID (1814239924) Active ✓</div>
+          </div>
+        </div>
+
+        <div class="card" style="border-color:#1e3a5f;">
+          <div class="card-header">
+            <span class="card-title">5. ⚡ PROPR Auto-Trader (Hyperliquid API)</span>
+            <span id="proprLiveBadge" class="badge" style="background:#334155; color:#fff;">OFF (SAFE)</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:7px; font-size:0.76rem;">
+            <input type="password" id="proprApiKey" placeholder="Paste PROPR API Key (pk_live_...)" />
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+              <label style="color:var(--muted);">Risk/Trade ($)
+                <input type="number" id="proprRiskUsd" value="15" min="5" max="100" step="1" style="width:100%; margin-top:2px;" />
+              </label>
+              <label style="color:var(--muted);">Daily Kill ($)
+                <input type="number" id="proprDailyKill" value="30" min="10" max="200" step="5" style="width:100%; margin-top:2px;" />
+              </label>
+              <label style="color:var(--muted);">Max Open
+                <input type="number" id="proprMaxOpen" value="2" min="1" max="3" step="1" style="width:100%; margin-top:2px;" />
+              </label>
+            </div>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; color:#fbbf24; font-weight:700;">
+              <input type="checkbox" id="proprAutoEnabled" /> Arm Live PROPR Auto-Execution (V2 Sniper Only)
+            </label>
+            <div style="display:flex; gap:6px;">
+              <button class="btn-primary" style="flex:1;" onclick="saveProprSettings()">💾 Save PROPR Settings</button>
+              <button class="btn-secondary" style="flex:1;" onclick="testProprConnection()">🔌 Test Connection</button>
+            </div>
+            <div id="proprStatusMsg" style="color:var(--muted); font-size:0.73rem;">Enter your pk_live_... key and click Test Connection first.</div>
+            <div id="proprExecLog" style="max-height:90px; overflow-y:auto; background:#090d16; border:1px solid #1e293b; border-radius:6px; padding:6px; font-size:0.7rem; color:#94a3b8; display:none;"></div>
           </div>
         </div>
       </div>
@@ -634,12 +668,34 @@ Please do these 2 steps right now to link with Agent 1:
       alert('Copied Gemini 3.8 Handshake Prompt to clipboard! Paste it into your Gemini 3.8 chat.');
     }
 
+    let lastChartRefresh = 0;
     async function refreshLiveStatus() {
-      const res = await fetch('/api/live/status');
-      const data = await res.json();
-      renderLiveStatus(data);
-      await loadLiveChart();
+      // Bandwidth Saver: If the user minimized or switched away from the tab, pause polling
+      if (document.hidden) return;
+
+      try {
+        const res = await fetch('/api/live/status');
+        const data = await res.json();
+        renderLiveStatus(data);
+
+        // Only reload the heavy 350-candle chart once every 60s (or when symbol changed / Scan Now clicked)
+        const now = Date.now();
+        if (now - lastChartRefresh >= 60000) {
+          lastChartRefresh = now;
+          await loadLiveChart();
+        }
+      } catch (e) {
+        // Ignore temporary offline/network blips
+      }
     }
+
+    // Refresh immediately when returning to the tab
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        refreshLiveStatus();
+        loadLiveChart();
+      }
+    });
 
     async function triggerScanNow() {
       const res = await fetch('/api/live/scan-now', { method: 'POST' });
@@ -690,7 +746,85 @@ Please do these 2 steps right now to link with Agent 1:
       }
     }
 
-    let selectedAccountMode = 'V2';
+    let proprInitialized = false;
+    function renderProprStatus(p) {
+      if (!p) return;
+      const badge = document.getElementById('proprLiveBadge');
+      if (badge) {
+        badge.textContent = p.enabled ? '⚡ LIVE ARMED' : 'OFF (SAFE)';
+        badge.style.background = p.enabled ? '#10b981' : '#334155';
+      }
+      if (!proprInitialized) {
+        proprInitialized = true;
+        const keyEl = document.getElementById('proprApiKey');
+        if (keyEl && p.maskedApiKey) keyEl.placeholder = `Saved: ${p.maskedApiKey}`;
+        const riskEl = document.getElementById('proprRiskUsd');
+        if (riskEl) riskEl.value = p.riskPerTradeUsd ?? 15;
+        const killEl = document.getElementById('proprDailyKill');
+        if (killEl) killEl.value = p.dailyLossLimitUsd ?? 30;
+        const maxEl = document.getElementById('proprMaxOpen');
+        if (maxEl) maxEl.value = p.maxOpenPositions ?? 2;
+        const enEl = document.getElementById('proprAutoEnabled');
+        if (enEl) enEl.checked = Boolean(p.enabled);
+      }
+      const logEl = document.getElementById('proprExecLog');
+      if (logEl && Array.isArray(p.executionLog) && p.executionLog.length > 0) {
+        logEl.style.display = 'block';
+        logEl.innerHTML = p.executionLog
+          .map((e) => `<div>[${new Date(e.timestamp).toLocaleTimeString()}] <b>${e.level}</b>: ${e.message}</div>`)
+          .join('');
+      }
+    }
+
+    async function saveProprSettings() {
+      const apiKey = document.getElementById('proprApiKey').value.trim();
+      const riskPerTradeUsd = Number(document.getElementById('proprRiskUsd').value || 15);
+      const dailyLossLimitUsd = Number(document.getElementById('proprDailyKill').value || 30);
+      const maxOpenPositions = Number(document.getElementById('proprMaxOpen').value || 2);
+      const enabled = document.getElementById('proprAutoEnabled').checked;
+      const res = await fetch('/api/propr/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey, riskPerTradeUsd, dailyLossLimitUsd, maxOpenPositions, enabled }),
+      });
+      const json = await res.json();
+      if (json.ok && json.propr) {
+        document.getElementById('proprApiKey').value = '';
+        proprInitialized = false;
+        renderProprStatus(json.propr);
+        document.getElementById('proprStatusMsg').style.color = '#34d399';
+        document.getElementById('proprStatusMsg').textContent = json.propr.enabled
+          ? `✅ Saved & LIVE ARMED ($${json.propr.riskPerTradeUsd}/trade, -$${json.propr.dailyLossLimitUsd} daily kill-switch)`
+          : `✅ Saved (Auto-Trading OFF — Safe Mode)`;
+      } else {
+        document.getElementById('proprStatusMsg').style.color = '#f87171';
+        document.getElementById('proprStatusMsg').textContent = `❌ Error: ${json.error || 'Failed to save'}`;
+      }
+    }
+
+    async function testProprConnection() {
+      await saveProprSettings();
+      const msg = document.getElementById('proprStatusMsg');
+      msg.style.color = '#fbbf24';
+      msg.textContent = 'Testing PROPR API connection...';
+      try {
+        const res = await fetch('/api/propr/test', { method: 'POST' });
+        const json = await res.json();
+        if (json.ok) {
+          msg.style.color = '#34d399';
+          msg.textContent = `✅ Connected! Account: ${json.accountId} | Open: ${json.openPositionsCount} | Today PnL: $${json.todayRealizedPnlUsd}`;
+          if (json.status) renderProprStatus(json.status);
+        } else {
+          msg.style.color = '#f87171';
+          msg.textContent = `❌ Failed: ${json.error || 'Check your API key'}`;
+        }
+      } catch (err) {
+        msg.style.color = '#f87171';
+        msg.textContent = `❌ Connection error: ${err.message}`;
+      }
+    }
+
+    let selectedAccountMode = 'V1';
     let lastLiveStatusData = null;
 
     function switchPaperAccountView(mode) {
@@ -698,10 +832,12 @@ Please do these 2 steps right now to link with Agent 1:
       if (lastLiveStatusData) {
         renderLiveStatus(lastLiveStatusData);
       }
+      loadLiveChart();
     }
 
     function renderLiveStatus(data) {
       lastLiveStatusData = data;
+      renderProprStatus(data.propr);
       syncSymbolDropdowns(data.watchedSymbols || []);
       if (data.minScoreThreshold && document.getElementById('minScoreSelect')) {
         document.getElementById('minScoreSelect').value = String(data.minScoreThreshold);
@@ -737,21 +873,36 @@ Please do these 2 steps right now to link with Agent 1:
       const acc = activePort.account;
       const camp = data.campaign;
 
-      // Render Side-by-Side Dual Account Switcher Cards
+      // Render Side-by-Side Dual-Timeframe Sniper Comparison (Strat 1: 5m vs Strat 2: 15m)
       const dualBox = document.getElementById('dualAccountSwitcherBox');
       if (dualBox) {
-        const a2 = v2Port.account;
         const a1 = v1Port.account;
+        const a2 = v2Port.account;
         const isV2 = selectedAccountMode === 'V2';
         dualBox.innerHTML = `
           <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:10px;">
-            <div onclick="switchPaperAccountView('V2')" style="cursor:pointer; background:${isV2 ? 'rgba(16,185,129,0.12)' : '#0f1624'}; border:2px solid ${isV2 ? '#10b981' : '#1e293b'}; border-radius:10px; padding:12px 14px; transition:0.15s;">
+            <div onclick="switchPaperAccountView('V1')" style="cursor:pointer; background:${!isV2 ? 'rgba(16,185,129,0.12)' : '#0f1624'}; border:2px solid ${!isV2 ? '#10b981' : '#1e293b'}; border-radius:10px; padding:12px 14px; transition:0.15s;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <span style="font-weight:800; font-size:0.88rem; color:#34d399;">🎯 ACCOUNT 2: V2 BTC-Compass Sniper (NEW)</span>
-                <span class="badge" style="background:${isV2 ? '#10b981' : '#1e293b'}; color:#fff; font-weight:700;">${isV2 ? '✓ VIEWING NOW' : 'Click to View'}</span>
+                <span style="font-weight:800; font-size:0.88rem; color:#34d399;">🎯 ACCOUNT 1: Strat 1 — 5m Sniper (PROPR 5K)</span>
+                <span class="badge" style="background:${!isV2 ? '#10b981' : '#1e293b'}; color:#fff; font-weight:700;">${!isV2 ? '✓ VIEWING 5m' : 'Click to View 5m'}</span>
               </div>
               <div style="font-size:0.72rem; color:var(--muted); margin-bottom:6px;">
-                Started Fresh Nov 9 ($10,000) • 4-Pillar BTC (EMA20+VWAP) • No Long/Short Mix • Max 2 Unhedged • Tournament Rank
+                5m Hyperliquid • $5,000 Start • $15 All-In Risk (Incl. Fees) • Copilot + 4-Pillar BTC • 25m Cooldown
+              </div>
+              <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:0.82rem;">
+                <div>Equity: <b class="${a1.netPnlUsd >= 0 ? 'pos' : 'neg'}">$${a1.liveEquity.toLocaleString()}</b> (${a1.netPnlUsd >= 0 ? '+' : ''}$${a1.netPnlUsd})</div>
+                <div>Win Rate: <b>${a1.winRatePct}%</b> (${a1.winsCount ?? 0}W / ${a1.lossesCount ?? 0}L)</div>
+                <div>Open: <b class="warn">${a1.openPositionsCount}</b></div>
+              </div>
+            </div>
+
+            <div onclick="switchPaperAccountView('V2')" style="cursor:pointer; background:${isV2 ? 'rgba(59,130,246,0.12)' : '#0f1624'}; border:2px solid ${isV2 ? '#3b82f6' : '#1e293b'}; border-radius:10px; padding:12px 14px; transition:0.15s;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span style="font-weight:800; font-size:0.88rem; color:#60a5fa;">🎯 ACCOUNT 2: Strat 2 — 15m Sniper (PROPR 5K)</span>
+                <span class="badge" style="background:${isV2 ? '#3b82f6' : '#1e293b'}; color:#fff; font-weight:700;">${isV2 ? '✓ VIEWING 15m' : 'Click to View 15m'}</span>
+              </div>
+              <div style="font-size:0.72rem; color:var(--muted); margin-bottom:6px;">
+                15m Hyperliquid • $5,000 Start • $15 All-In Risk (Incl. Fees) • Copilot + 4-Pillar BTC • 45m Cooldown
               </div>
               <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:0.82rem;">
                 <div>Equity: <b class="${a2.netPnlUsd >= 0 ? 'pos' : 'neg'}">$${a2.liveEquity.toLocaleString()}</b> (${a2.netPnlUsd >= 0 ? '+' : ''}$${a2.netPnlUsd})</div>
@@ -759,26 +910,11 @@ Please do these 2 steps right now to link with Agent 1:
                 <div>Open: <b class="warn">${a2.openPositionsCount}</b></div>
               </div>
             </div>
-
-            <div onclick="switchPaperAccountView('V1')" style="cursor:pointer; background:${!isV2 ? 'rgba(59,130,246,0.12)' : '#0f1624'}; border:2px solid ${!isV2 ? '#3b82f6' : '#1e293b'}; border-radius:10px; padding:12px 14px; transition:0.15s;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <span style="font-weight:800; font-size:0.88rem; color:#60a5fa;">📊 ACCOUNT 1: V1 Ongoing Baseline (Started Nov 6)</span>
-                <span class="badge" style="background:${!isV2 ? '#3b82f6' : '#1e293b'}; color:#fff; font-weight:700;">${!isV2 ? '✓ VIEWING NOW' : 'Click to View'}</span>
-              </div>
-              <div style="font-size:0.72rem; color:var(--muted); margin-bottom:6px;">
-                Continuing Original 7-Day Forward Test Uninterrupted (Takes all &ge;60p signals, 1 per symbol)
-              </div>
-              <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:0.82rem;">
-                <div>Equity: <b class="${a1.netPnlUsd >= 0 ? 'pos' : 'neg'}">$${a1.liveEquity.toLocaleString()}</b> (${a1.netPnlUsd >= 0 ? '+' : ''}$${a1.netPnlUsd})</div>
-                <div>Win Rate: <b>${a1.winRatePct}%</b> (${a1.closedTradesCount} trades)</div>
-                <div>Open: <b class="warn">${a1.openPositionsCount}</b></div>
-              </div>
-            </div>
           </div>
         `;
       }
 
-      const acctLabel = selectedAccountMode === 'V2' ? 'V2 Sniper' : 'V1 Ongoing';
+      const acctLabel = selectedAccountMode === 'V2' ? 'Strat 2 (15m)' : 'Strat 1 (5m)';
       const kpis = [
         {
           label: `Active View (${acctLabel})`,
@@ -860,8 +996,11 @@ Please do these 2 steps right now to link with Agent 1:
           const limStopPct = limPrice > 0 ? ((limStopDist / limPrice) * 100).toFixed(2) : '0.00';
 
           const decimals = s.entryPrice < 2 ? 1 : 3;
-          const mktQty = mktStopDist > 0 ? (riskUsd / mktStopDist).toFixed(decimals) : 0;
-          const limQty = limStopDist > 0 ? (riskUsd / limStopDist).toFixed(decimals) : 0;
+          // Fee-inclusive sizing (PROPR: 0.045% taker / 0.015% maker + 0.02% slippage buffer)
+          const mktAllInPerUnit = mktStopDist + (s.entryPrice + s.stopLoss) * 0.00045 + s.entryPrice * 0.0002;
+          const limAllInPerUnit = limStopDist + limPrice * 0.00015 + s.stopLoss * 0.00045;
+          const mktQty = mktAllInPerUnit > 0 ? (riskUsd / mktAllInPerUnit).toFixed(decimals) : 0;
+          const limQty = limAllInPerUnit > 0 ? (riskUsd / limAllInPerUnit).toFixed(decimals) : 0;
 
           const coinName = s.symbol.split('_')[0];
           const copyMkt = `${s.symbol} ${s.side} (MARKET) | Entry: ${s.entryPrice} | SL: ${s.stopLoss} | TP1: ${s.tp1Price} | TP2: ${s.tp2Price} | Size: ${mktQty} ${coinName}`;
@@ -1113,11 +1252,12 @@ Please do these 2 steps right now to link with Agent 1:
 
     async function loadLiveChart() {
       const symbol = document.getElementById('liveSymbolSelect').value;
-      const res = await fetch(`/api/live/chart?symbol=${encodeURIComponent(symbol)}`);
+      const tf = selectedAccountMode === 'V2' ? '15m' : '5m';
+      const res = await fetch(`/api/live/chart?symbol=${encodeURIComponent(symbol)}&tf=${tf}`);
       const chartData = await res.json();
       if (!chartData || !chartData.candles) return;
 
-      document.getElementById('chartSourceBadge').textContent = `${chartData.symbol} • ${chartData.source} • Last: ${chartData.lastPrice} • Bias: ${chartData.trendBias}`;
+      document.getElementById('chartSourceBadge').textContent = `${chartData.symbol} (${tf}) • ${chartData.source} • Last: ${chartData.lastPrice} • Bias: ${chartData.trendBias}`;
       drawCandlesAndOrderBlocks(chartData);
       drawDeltaHistogram(chartData.candles);
       renderFootprintInspector(chartData.candles[chartData.candles.length - 1]);
@@ -1357,7 +1497,8 @@ Please do these 2 steps right now to link with Agent 1:
     }
 
     refreshLiveStatus();
-    setInterval(refreshLiveStatus, 10000);
+    loadLiveChart();
+    setInterval(refreshLiveStatus, 15000);
   </script>
 </body>
 </html>

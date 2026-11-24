@@ -16,16 +16,16 @@ const renderUrl = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || '
 
 const trader = new LivePaperTrader({
   symbols: [
-    'BTC_USDT',
-    'ETH_USDT',
-    'SOL_USDT',
-    'SUI_USDT',
-    'HYPE_USDT',
-    'BNB_USDT',
-    'ZEC_USDT',
-    'ENA_USDT',
-    'ONDO_USDT',
-    'ARB_USDT',
+    'BTC_USDC',
+    'ETH_USDC',
+    'SOL_USDC',
+    'SUI_USDC',
+    'HYPE_USDC',
+    'PUMP_USDC',
+    'DOGE_USDC',
+    'BNB_USDC',
+    'XRP_USDC',
+    'ONDO_USDC',
   ],
   pollIntervalMs: intervalMs,
 });
@@ -43,8 +43,10 @@ async function runCloudCycle() {
       }
 
       const snap = trader.getStatusSnapshot();
+      const a5 = snap.v1Portfolio.account;
+      const a15 = snap.v2Portfolio.account;
       console.log(
-        `[Cycle ${i + 1}/${iterations}] Equity: $${snap.account.liveEquity} | Open Trades: ${snap.account.openPositionsCount} | Watched: ${snap.watchedSymbols.length}`
+        `[Cycle ${i + 1}/${iterations}] 5m Sniper: $${a5.liveEquity} (${a5.openPositionsCount} open) | 15m Sniper: $${a15.liveEquity} (${a15.openPositionsCount} open) | Watched: ${snap.watchedSymbols.length}`
       );
     } catch (err) {
       console.error(`[Cycle ${i + 1}] Error:`, err.message);

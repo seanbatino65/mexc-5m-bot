@@ -1,10 +1,9 @@
 /**
- * Real-Time MEXC Futures & Multi-Exchange Live 5m Kline Fetcher
+ * Real-Time Hyperliquid (PROPR) & Multi-Exchange Live 5m Kline Fetcher
  *
- * Connects to MEXC Futures (`contract.mexc.com`) and MEXC V3 (`api.mexc.com`) first,
- * records detailed connection diagnostics to `data/connection_diagnostics.json`,
- * and automatically falls back to live USDT-M Perpetual feeds (Bitget, Gate.io, Bybit, CryptoCompare)
- * if the local ISP blocks `mexc.com`.
+ * Connects to Hyperliquid Mainnet (`api.hyperliquid.xyz/info`) FIRST for exact
+ * PROPR / Hyperliquid perpetual candles, live Mark Price, Open Interest & Funding,
+ * enriches with Spot CVD / Perp Taker flow, and keeps Bitget / Gate / Bybit as fallbacks.
  */
 
 import fs from 'node:fs';
@@ -14,6 +13,9 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, '../../data');
 const DIAG_FILE = path.join(DATA_DIR, 'connection_diagnostics.json');
+const HYPERLIQUID_INFO_URL = 'https://api.hyperliquid.xyz/info';
+
+const HL_K_PREFIX_COINS = new Set(['PEPE', 'BONK', 'SHIB', 'FLOKI', 'LUNC', 'NEIRO']);
 
 export class MexcDataFetcher {
   constructor() {
@@ -21,6 +23,95 @@ export class MexcDataFetcher {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     this.lastDiagnostics = {};
+    this._hlMetaCache = null;
+    this._hlMetaFetchedAt = 0;
+  }
+
+  _toHyperliquidCoin(symbol = 'BTC_USDC') {
+    const raw = String(symbol || 'BTC_USDC')
+      .trim()
+      .toUpperCase()
+      .replace(/[-/](USDC|USDT|USD)$/i, '')
+      .replace(/_(USDC|USDT|USD)$/i, '');
+    if (raw.startsWith('1000')) {
+      return `k${raw.slice(4)}`;
+    }
+    if (HL_K_PREFIX_COINS.has(raw)) {
+      return `k${raw}`;
+    }
+    return raw;
+  }
+
+  _toHyperliquidInterval(interval = 'Min5') {
+    const map = {
+      Min1: '1m',
+      Min5: '5m',
+      Min15: '15m',
+      Min30: '30m',
+      Min60: '1h',
+      Hour1: '1h',
+      Hour4: '4h',
+      Day1: '1d',
+      '1m': '1m',
+      '5m': '5m',
+      '15m': '15m',
+      '1h': '1h',
+      '4h': '4h',
+    };
+    return map[interval] || '5m';
+  }
+
+  async _fetchHyperliquidPost(bodyObj, timeoutMs = 5000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(HYPERLIQUID_INFO_URL, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(bodyObj),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async getHyperliquidAssetCtx(symbol) {
+    const coin = this._toHyperliquidCoin(symbol);
+    const now = Date.now();
+    if (!this._hlMetaCache || now - this._hlMetaFetchedAt > 8000) {
+      try {
+        const data = await this._fetchHyperliquidPost({ type: 'metaAndAssetCtxs' }, 4000);
+        if (Array.isArray(data) && data.length >= 2 && Array.isArray(data[0]?.universe)) {
+          const map = new Map();
+          const universe = data[0].universe;
+          const ctxs = data[1];
+          for (let i = 0; i < universe.length; i++) {
+            const name = universe[i]?.name;
+            const ctx = ctxs[i];
+            if (name && ctx) {
+              const markPx = Number(ctx.markPx || ctx.midPx || 0);
+              const oiContracts = Number(ctx.openInterest || 0);
+              map.set(name, {
+                coin: name,
+                markPx,
+                openInterestContracts: oiContracts,
+                openInterestUsd: markPx > 0 ? oiContracts * markPx : 0,
+                funding: Number(ctx.funding || 0),
+                dayNtlVlm: Number(ctx.dayNtlVlm || 0),
+              });
+            }
+          }
+          this._hlMetaCache = map;
+          this._hlMetaFetchedAt = now;
+        }
+      } catch {
+        // Keep stale cache if available
+      }
+    }
+    return this._hlMetaCache?.get(coin) || null;
   }
 
   _saveDiagnostic(symbol, provider, status, detail) {
@@ -40,17 +131,56 @@ export class MexcDataFetcher {
   }
 
   /**
-   * Fetches live 5m candles (prioritizing MEXC Futures -> MEXC Spot V3 -> Live Perpetual Mirrors).
+   * Fetches live 5m candles (prioritizing Hyperliquid Mainnet -> Bitget -> Gate -> Bybit).
    * Returns { candles, source }.
    */
-  async fetchLiveCandles(symbol = 'BTC_USDT', interval = 'Min5', totalBars = 350) {
-    const cleanSymbol = symbol.replace('_', ''); // e.g. BTCUSDT
-    const baseCoin = symbol.split('_')[0];      // e.g. BTC
+  async fetchLiveCandles(symbol = 'BTC_USDC', interval = 'Min5', totalBars = 350) {
+    const baseCoin = symbol.split(/[_-]/)[0].toUpperCase(); // e.g. BTC
+    const usdtSymbol = `${baseCoin}_USDT`;
+    const cleanSymbol = `${baseCoin}USDT`; // e.g. BTCUSDT
+    const hlCoin = this._toHyperliquidCoin(symbol);
+    const hlInterval = this._toHyperliquidInterval(interval);
+    const intervalMsMap = { '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '4h': 14400000, '1d': 86400000 };
+    const stepMs = intervalMsMap[hlInterval] || 300000;
 
-    // 1. Try MEXC Futures Contract API
+    // 0. PRIMARY: Hyperliquid Mainnet Perpetuals API (exact PROPR chart feed)
+    try {
+      const endTime = Date.now();
+      const startTime = endTime - (totalBars + 5) * stepMs;
+      const rows = await this._fetchHyperliquidPost(
+        {
+          type: 'candleSnapshot',
+          req: { coin: hlCoin, interval: hlInterval, startTime, endTime },
+        },
+        5500
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        const candles = rows.slice(-totalBars).map((r) => ({
+          timestamp: Number(r.t),
+          open: Number(r.o),
+          high: Number(r.h),
+          low: Number(r.l),
+          close: Number(r.c),
+          volume: Number(r.v),
+        }));
+        this._saveDiagnostic(
+          symbol,
+          'HYPERLIQUID_MAINNET',
+          'OK',
+          `Loaded ${candles.length} bars (${hlCoin} ${hlInterval}), last=${candles[candles.length - 1]?.close}`
+        );
+        await this._enrichWithOiSpotPerpFlow(symbol, candles);
+        return { candles, source: 'HYPERLIQUID_MAINNET' };
+      }
+      this._saveDiagnostic(symbol, 'HYPERLIQUID_MAINNET', 'EMPTY', `No candles returned for ${hlCoin}`);
+    } catch (err) {
+      this._saveDiagnostic(symbol, 'HYPERLIQUID_MAINNET', 'ERROR', `${err.message}`);
+    }
+
+    // 1. Fallback: MEXC Futures Contract API
     try {
       const contractUrl = `https://contract.mexc.com/api/v1/contract/kline/${encodeURIComponent(
-        symbol
+        usdtSymbol
       )}?interval=${interval}`;
       const json = await this._fetchJsonWithTimeout(contractUrl, 5000);
       if (json?.success && json?.data && Array.isArray(json.data.time) && json.data.time.length > 0) {
@@ -268,24 +398,28 @@ export class MexcDataFetcher {
    */
   async _enrichWithOiSpotPerpFlow(symbol, candles) {
     if (!Array.isArray(candles) || candles.length === 0) return candles;
-    const cleanSymbol = symbol.replace('_', '');
+    const baseCoin = symbol.split(/[_-]/)[0].toUpperCase();
+    const usdtSymbol = `${baseCoin}_USDT`;
+    const cleanSymbol = `${baseCoin}USDT`;
     const bucket5m = (ts) => Math.floor(Number(ts) / 300000) * 300000;
 
     const gateStatsUrl = `https://api.gateio.ws/api/v4/futures/usdt/contract_stats?contract=${encodeURIComponent(
-      symbol
+      usdtSymbol
     )}&interval=5m&limit=100`;
     const binanceSpotUrl = `https://data-api.binance.vision/api/v3/klines?symbol=${encodeURIComponent(
       cleanSymbol
     )}&interval=5m&limit=120`;
     const gateSpotUrl = `https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=${encodeURIComponent(
-      symbol
+      usdtSymbol
     )}&interval=5m&limit=120`;
 
-    const [gateStatsRes, binanceSpotRes, gateSpotRes] = await Promise.allSettled([
+    const [hlCtxRes, gateStatsRes, binanceSpotRes, gateSpotRes] = await Promise.allSettled([
+      this.getHyperliquidAssetCtx(symbol),
       this._fetchJsonWithTimeout(gateStatsUrl, 3200),
       this._fetchJsonWithTimeout(binanceSpotUrl, 3200),
       this._fetchJsonWithTimeout(gateSpotUrl, 3200),
     ]);
+    const hlCtx = hlCtxRes.status === 'fulfilled' ? hlCtxRes.value : null;
 
     const oiByTs = new Map();
     const perpRatioByTs = new Map();
@@ -383,6 +517,19 @@ export class MexcDataFetcher {
         c.spotBuyRatio = spotInfo.spotBuyRatio;
         c.hasRealSpotFlow = true;
       }
+    }
+
+    // 4. Attach Hyperliquid live Mark Price, Open Interest USD & Funding Rate to latest bar
+    if (hlCtx && candles.length > 0) {
+      const latest = candles[candles.length - 1];
+      if (!latest.openInterestUsd && hlCtx.openInterestUsd > 0) {
+        latest.openInterestUsd = hlCtx.openInterestUsd;
+      }
+      if (typeof hlCtx.funding === 'number' && hlCtx.funding !== 0) {
+        latest.fundingRate = hlCtx.funding;
+      }
+      latest.hlOpenInterestUsd = hlCtx.openInterestUsd;
+      latest.hlMarkPx = hlCtx.markPx;
     }
 
     return candles;

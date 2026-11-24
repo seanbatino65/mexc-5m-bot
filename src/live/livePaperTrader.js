@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MexcDataFetcher } from '../data/mexcDataFetcher.js';
 import { CLCFuturesStrategy } from '../strategy/clcFuturesStrategy.js';
+import { ProprAutoTrader } from '../execution/proprAutoTrader.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STATE_FILE = path.resolve(__dirname, '../../data/paper_trading_state.json');
@@ -23,9 +24,18 @@ const PRIMARY_AGENT_CONVERSATION_ID = 'ede03f66-932a-4372-a3e3-53fde077d75f';
 
 export class LivePaperTrader {
   constructor(options = {}) {
-    this.defaultSymbols = options.symbols || ['BTC_USDT', 'ETH_USDT', 'SOL_USDT', 'SUI_USDT'];
+    this.defaultSymbols = options.symbols || [
+      'BTC_USDC',
+      'ETH_USDC',
+      'SOL_USDC',
+      'SUI_USDC',
+      'HYPE_USDC',
+      'PUMP_USDC',
+      'DOGE_USDC',
+    ];
     this.pollIntervalMs = options.pollIntervalMs || 8000;
     this.fetcher = new MexcDataFetcher();
+    this.proprTrader = new ProprAutoTrader(this.fetcher);
     this.strategy = new CLCFuturesStrategy({
       requireOrderFlowConfirmation: true,
       minOrderFlowSignals: 1,
@@ -37,18 +47,52 @@ export class LivePaperTrader {
       tp1ClosePct: 0.5,
       tp2RR: 3.2,
     });
+    this.strategy15m = new CLCFuturesStrategy({
+      requireOrderFlowConfirmation: true,
+      minOrderFlowSignals: 1,
+      minTotalConfluenceScore: 70,
+      maxEntryDistanceObRatio: 0.70,
+      slBufferAtr: 0.45,
+      minStopAtr: 0.65,
+      tp1RR: 1.8,
+      tp1ClosePct: 0.5,
+      tp2RR: 3.2,
+      minLiveCandleAgeSec: 240,
+      obConfig: { maxZoneAgeBars: 140 },
+    });
 
     this.marketCache = {};
+    this.marketCache15m = {};
     this.state = this._loadOrCreateState();
     if (!Array.isArray(this.state.watchedSymbols) || this.state.watchedSymbols.length === 0) {
       this.state.watchedSymbols = [...this.defaultSymbols];
       this._saveState();
+    } else {
+      // Auto-migrate legacy MEXC _USDT watchlist entries to Hyperliquid _USDC
+      let migrated = false;
+      const nextList = [];
+      for (const s of this.state.watchedSymbols) {
+        const norm = this.normalizeSymbol(s);
+        if (norm !== s) migrated = true;
+        if (norm && !nextList.includes(norm)) nextList.push(norm);
+      }
+      for (const hlCoin of ['PUMP_USDC', 'DOGE_USDC']) {
+        if (!nextList.includes(hlCoin)) {
+          nextList.push(hlCoin);
+          migrated = true;
+        }
+      }
+      if (migrated) {
+        this.state.watchedSymbols = nextList;
+        this._saveState();
+      }
     }
     if (typeof this.state.minScoreThreshold !== 'number' || this.state.minScoreThreshold < 70) {
       this.state.minScoreThreshold = 70;
       this._saveState();
     }
     this.strategy.config.minTotalConfluenceScore = this.state.minScoreThreshold;
+    this.strategy15m.config.minTotalConfluenceScore = this.state.minScoreThreshold;
     this.symbols = this.state.watchedSymbols;
     this.alertConfig = this._loadAlertConfig();
     this.agentBus = this._loadAgentBus();
@@ -251,17 +295,18 @@ export class LivePaperTrader {
     if (!rawInput) return '';
     let s = String(rawInput).trim().toUpperCase().replace(/[^A-Z0-9_]/g, '');
     if (!s) return '';
-    if (s.endsWith('_USDT')) return s;
-    if (s.endsWith('USDT')) {
+    if (s.endsWith('_USDC')) return s;
+    if (s.endsWith('_USDT')) return `${s.slice(0, -5)}_USDC`;
+    if (s.endsWith('USDC') || s.endsWith('USDT')) {
       const base = s.slice(0, -4).replace(/_+$/, '');
-      return `${base}_USDT`;
+      return `${base}_USDC`;
     }
-    return `${s}_USDT`;
+    return `${s}_USDC`;
   }
 
   async addSymbol(rawSymbol) {
     const symbol = this.normalizeSymbol(rawSymbol);
-    if (!symbol || symbol === '_USDT') {
+    if (!symbol || symbol === '_USDC') {
       throw new Error('Invalid token symbol');
     }
     if (!this.state.watchedSymbols.includes(symbol)) {
@@ -407,22 +452,22 @@ export class LivePaperTrader {
       campaignStartTimestamp: now,
       campaignTargetEndTimestamp: now + 7 * 24 * 60 * 60 * 1000,
       watchedSymbols: [...this.defaultSymbols],
-      initialEquity: 10000,
-      currentEquity: 10000,
-      peakEquity: 10000,
+      initialEquity: 5000,
+      currentEquity: 5000,
+      peakEquity: 5000,
       maxDrawdownPct: 0,
-      riskPerTradePct: 0.01,
-      maxLeverage: 10,
-      takerFeeRate: 0.0002,
-      makerFeeRate: 0.0000,
+      riskPerTradePct: 0.003,
+      maxLeverage: 5,
+      takerFeeRate: 0.00045,
+      makerFeeRate: 0.00015,
       openPositions: [],
       closedTrades: [],
       v2Account: {
-        name: 'V2 BTC-Compass Sniper (New)',
+        name: 'V2 BTC-Compass Sniper (PROPR 5K)',
         startedAt: new Date(now).toISOString(),
-        initialEquity: 10000,
-        currentEquity: 10000,
-        peakEquity: 10000,
+        initialEquity: 5000,
+        currentEquity: 5000,
+        peakEquity: 5000,
         maxDrawdownPct: 0,
         openPositions: [],
         closedTrades: [],
@@ -475,7 +520,7 @@ export class LivePaperTrader {
     return this.alertConfig;
   }
 
-  resetPaperAccount(initialEquity = 10000) {
+  resetPaperAccount(initialEquity = 5000) {
     const keepSymbols = this.state?.watchedSymbols || [...this.defaultSymbols];
     if (fs.existsSync(STATE_FILE)) fs.unlinkSync(STATE_FILE);
     this.state = this._loadOrCreateState();
@@ -484,6 +529,15 @@ export class LivePaperTrader {
     this.state.initialEquity = initialEquity;
     this.state.currentEquity = initialEquity;
     this.state.peakEquity = initialEquity;
+    if (this.state.v2Account) {
+      this.state.v2Account.initialEquity = initialEquity;
+      this.state.v2Account.currentEquity = initialEquity;
+      this.state.v2Account.peakEquity = initialEquity;
+      this.state.v2Account.maxDrawdownPct = 0;
+      this.state.v2Account.openPositions = [];
+      this.state.v2Account.closedTrades = [];
+      this.state.v2Account.startedAt = new Date().toISOString();
+    }
     this._saveState();
     return this.state;
   }
@@ -519,10 +573,10 @@ export class LivePaperTrader {
     this.isScanning = true;
 
     try {
-      // 1. Always scan BTC_USDT first so the BTC Master Compass has live 15m/1H/VWAP/EMA data
+      // 1. Always scan BTC_USDC first so the BTC Master Compass has live 5m/1H/VWAP/EMA data
       const orderedSymbols = [
-        'BTC_USDT',
-        ...this.symbols.filter((s) => s !== 'BTC_USDT'),
+        'BTC_USDC',
+        ...this.symbols.filter((s) => s !== 'BTC_USDC'),
       ];
       this.pendingCycleCandidates = [];
       for (const symbol of orderedSymbols) {
@@ -568,7 +622,7 @@ export class LivePaperTrader {
     const cryptoAdd = Math.round(((bullishCount - bearishCount) / total) * 1500); // Scaled -1500 to +1500 like NYSE ADD
 
     let btc1hChg = 0;
-    const btcCache = this.marketCache['BTC_USDT'];
+    const btcCache = this.marketCache['BTC_USDC'] || this.marketCache['BTC_USDT'];
     if (btcCache && Array.isArray(btcCache.candles) && btcCache.candles.length >= 13) {
       const bars = btcCache.candles;
       const cur = bars[bars.length - 1];
@@ -591,7 +645,7 @@ export class LivePaperTrader {
    * Verified at 75.0% Win Rate (+$1,486.37) across the 82 live trades.
    */
   _evaluateBtcMacroGuard(symbol, side) {
-    const btcCache = this.marketCache['BTC_USDT'];
+    const btcCache = this.marketCache['BTC_USDC'] || this.marketCache['BTC_USDT'];
     if (!btcCache || !Array.isArray(btcCache.candles) || btcCache.candles.length < 20) {
       return { allowed: true, reason: 'BTC_CACHE_WARMING_UP' };
     }
@@ -673,8 +727,12 @@ export class LivePaperTrader {
    * 4. Caps simultaneous unhedged same-side positions at 2 (max 3 total open) so a single BTC candle cannot stop out 5-6 altcoins at once
    */
   _canOpenV2PortfolioPosition(symbol, sig) {
-    const v2 = this.state.v2Account;
-    if (!v2) return { allowed: false, reason: 'V2_NOT_INITIALIZED' };
+    return this._canOpenSniperPosition(this.state.v2Account, symbol, sig, 45);
+  }
+
+  _canOpenSniperPosition(targetAccount, symbol, sig, cooldownMinutes = 25) {
+    const v2 = targetAccount;
+    if (!v2) return { allowed: false, reason: 'ACCOUNT_NOT_INITIALIZED' };
 
     // 0. Hard-Lock Copilot SKIP Rejection
     if (sig.claudeReview && sig.claudeReview.verdict === 'SKIP') {
@@ -688,19 +746,19 @@ export class LivePaperTrader {
     }
 
     if (v2.openPositions.some((p) => p.symbol === targetSym)) {
-      return { allowed: false, reason: 'ALREADY_OPEN_ON_SYMBOL_V2' };
+      return { allowed: false, reason: 'ALREADY_OPEN_ON_SYMBOL' };
     }
 
-    // 25-minute Post-Stop-Loss Cooldown Guard (prevents catching falling knives)
+    // Post-Stop-Loss Cooldown Guard (prevents catching falling knives)
     const closedV2 = v2.closedTrades || [];
     const recentStopLoss = closedV2.some(
       (t) => t.symbol === targetSym &&
              t.side === sig.side &&
              t.exitReason === 'STOP_LOSS' &&
-             (Date.now() - new Date(t.closedAt).getTime() < 25 * 60 * 1000)
+             (Date.now() - new Date(t.closedAt).getTime() < cooldownMinutes * 60 * 1000)
     );
     if (recentStopLoss) {
-      return { allowed: false, reason: 'POST_STOP_LOSS_25M_COOLDOWN' };
+      return { allowed: false, reason: `POST_STOP_LOSS_${cooldownMinutes}M_COOLDOWN` };
     }
 
     const btcGuard = this._evaluateBtcMacroGuard(targetSym, sig.side);
@@ -835,8 +893,8 @@ export class LivePaperTrader {
     }
 
     // Check 3: BTC Market Leader Correlation & Macro Guard
-    const btcMarket = this.marketCache['BTC_USDT'];
-    if (btcMarket && symbol !== 'BTC_USDT') {
+    const btcMarket = this.marketCache['BTC_USDC'] || this.marketCache['BTC_USDT'];
+    if (btcMarket && symbol !== 'BTC_USDC' && symbol !== 'BTC_USDT') {
       const btcGuard = this._evaluateBtcMacroGuard(symbol, sig.side);
       if (!btcGuard.allowed) {
         confidence -= 25;
@@ -895,23 +953,31 @@ export class LivePaperTrader {
   }
 
   async scanSymbol(symbol, deferExecution = false) {
+    await this._scanTimeframeForSymbol(symbol, 'Min5', this.strategy, this.marketCache, '5m');
+    await this._scanTimeframeForSymbol(symbol, 'Min15', this.strategy15m, this.marketCache15m, '15m');
+    if (!deferExecution) {
+      this._processPendingCycleCandidates();
+    }
+  }
+
+  async _scanTimeframeForSymbol(symbol, interval, strategyInstance, targetCache, timeframeTag = '5m') {
     let rawCandles = null;
-    let source = 'MEXC_FUTURES_LIVE';
+    let source = 'HYPERLIQUID_MAINNET';
+    const barsToFetch = timeframeTag === '15m' ? 300 : 350;
 
     try {
-      const liveRes = await this.fetcher.fetchLiveCandles(symbol, 'Min5', 350);
+      const liveRes = await this.fetcher.fetchLiveCandles(symbol, interval, barsToFetch);
       rawCandles = liveRes.candles;
       source = liveRes.source;
       await this._enrichLatestBarWithLiveDeals(symbol, rawCandles);
     } catch {
       // Never fall back to historical cached/simulated files during live scanning!
-      // Skipping a single timed-out poll cycle prevents old cached prices from triggering false TP/SL on live positions.
       return;
     }
 
     if (!rawCandles || rawCandles.length < 40) return;
 
-    const { candles, orderBlocks, structureEvents, signals } = this.strategy.prepareAndScan(rawCandles);
+    const { candles, orderBlocks, structureEvents, signals } = strategyInstance.prepareAndScan(rawCandles);
     const latestBar = candles[candles.length - 1];
 
     const activeOrderBlocks = orderBlocks.filter(
@@ -936,10 +1002,10 @@ export class LivePaperTrader {
         let liveScore = null;
         let liveStatusText = null;
         if (inZone) {
-          const evNow = this.strategy.evaluateSetup(candles, candles.length - 1, ob, orderBlocks);
+          const evNow = strategyInstance.evaluateSetup(candles, candles.length - 1, ob, orderBlocks);
           const evPrev =
             candles.length >= 2
-              ? this.strategy.evaluateSetup(candles, candles.length - 2, ob, orderBlocks)
+              ? strategyInstance.evaluateSetup(candles, candles.length - 2, ob, orderBlocks)
               : null;
           const bestEv =
             evNow.valid
@@ -957,7 +1023,7 @@ export class LivePaperTrader {
           } else {
             const r = bestEv?.reason || '';
             const shortReason = r.includes('MATURATION')
-              ? 'Wait 5m Candle Maturation'
+              ? `Wait ${timeframeTag} Candle Maturation`
               : r.includes('REJECTION_CLOSE')
               ? ob.type === 'BULLISH'
                 ? 'Wait Bullish Close/Wick'
@@ -985,8 +1051,9 @@ export class LivePaperTrader {
       .sort((a, b) => a.distancePct - b.distancePct)
       .slice(0, 8);
 
-    this.marketCache[symbol] = {
+    targetCache[symbol] = {
       symbol,
+      timeframe: timeframeTag,
       source,
       updatedAt: new Date().toISOString(),
       lastPrice: this._formatPrice(latestBar.close),
@@ -1044,8 +1111,12 @@ export class LivePaperTrader {
       structureEvents: structureEvents.slice(-20),
     };
 
-    // Update any open Paper Trading positions for this symbol
-    this._updateOpenPositionsForSymbol(symbol, latestBar);
+    // Update open Paper Trading positions for this timeframe's dedicated account
+    if (timeframeTag === '5m') {
+      this._updateAccountPositionsForSymbol(this.state, 'Strat 1 (5m Sniper)', symbol, latestBar);
+    } else if (this.state.v2Account) {
+      this._updateAccountPositionsForSymbol(this.state.v2Account, 'Strat 2 (15m Sniper)', symbol, latestBar);
+    }
 
     // Backfill limitEntryPrice on any older signals in state
     for (const oldSig of this.state.signalsFeed) {
@@ -1082,13 +1153,15 @@ export class LivePaperTrader {
           : 0;
       if (distFromObPct > 0.35) continue;
 
-      const sigKey = `${symbol}_${sig.orderBlockId}_${sig.timestamp}`;
+      const sigKey = `${timeframeTag}_${symbol}_${sig.orderBlockId}_${sig.timestamp}`;
       if (this.state.processedSignalKeys.includes(sigKey)) continue;
 
       sig.symbol = symbol;
+      sig.timeframe = timeframeTag;
       const coAgentReview = this._evaluateBuiltInCoAgent(symbol, sig, candles);
       this.pendingCycleCandidates.push({
         symbol,
+        timeframe: timeframeTag,
         sig,
         sigKey,
         candles,
@@ -1096,10 +1169,6 @@ export class LivePaperTrader {
         coAgentReview,
         token1hChg,
       });
-    }
-
-    if (!deferExecution) {
-      this._processPendingCycleCandidates();
     }
   }
 
@@ -1156,7 +1225,7 @@ export class LivePaperTrader {
     scored.sort((a, b) => b.selectionRank - a.selectionRank);
 
     for (const item of scored) {
-      const { symbol, sig, sigKey, source, coAgentReview, relVsBtc } = item;
+      const { symbol, timeframe = '5m', sig, sigKey, source, coAgentReview, relVsBtc } = item;
       if (this.state.processedSignalKeys.includes(sigKey)) continue;
 
       const minFloor = Math.max(70, this.state.minScoreThreshold || 70);
@@ -1167,9 +1236,22 @@ export class LivePaperTrader {
         continue;
       }
 
-      const canOpenV1 = !this.state.openPositions.some((p) => p.symbol === symbol);
-      const v2Gate = this._canOpenV2PortfolioPosition(symbol, sig);
-      const canOpenV2 = v2Gate.allowed;
+      // DUAL-TIMEFRAME SNIPER MODE:
+      // Account 1 (Strat 1) = 5m V2 Sniper (25m Post-SL Cooldown)
+      // Account 2 (Strat 2) = 15m V2 Sniper (45m Post-SL Cooldown)
+      let canOpenV1 = false;
+      let canOpenV2 = false;
+      let gateReason = '';
+
+      if (timeframe === '5m') {
+        const g5 = this._canOpenSniperPosition(this.state, symbol, sig, 25);
+        canOpenV1 = g5.allowed;
+        gateReason = g5.reason;
+      } else {
+        const g15 = this._canOpenSniperPosition(this.state.v2Account, symbol, sig, 45);
+        canOpenV2 = g15.allowed;
+        gateReason = g15.reason;
+      }
 
       if (!canOpenV1 && !canOpenV2) continue;
 
@@ -1183,14 +1265,15 @@ export class LivePaperTrader {
         sig.side === 'LONG'
           ? `RelStrength vs BTC: ${relVsBtc >= 0 ? '+' : ''}${relVsBtc.toFixed(2)}%`
           : `RelWeakness vs BTC: ${relVsBtc >= 0 ? '+' : ''}${relVsBtc.toFixed(2)}%`;
-      const acctBadge = canOpenV2
-        ? '🎯 Entered: V2 Sniper + V1 Ongoing'
-        : `📊 Entered: V1 Ongoing Only (V2 Skipped: ${v2Gate.reason})`;
+      const acctBadge = canOpenV1
+        ? '🎯 Entered: Account 1 — Strat 1 (5m Sniper)'
+        : '🎯 Entered: Account 2 — Strat 2 (15m Sniper)';
       coAgentReview.reasoning = `${acctBadge} • ${coAgentReview.reasoning} • ${relLabel} • Breadth: ${breadth.bullBreadthPct}% Bull / ${breadth.bearBreadthPct}% Bear`;
 
       const signalRecord = {
         id: `SIG_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
         symbol,
+        timeframe,
         timestamp: sig.timestamp,
         detectedAt: new Date().toISOString(),
         side: sig.side,
@@ -1214,19 +1297,19 @@ export class LivePaperTrader {
         claudeReview: coAgentReview,
         enteredV1: canOpenV1,
         enteredV2: canOpenV2,
-        v2GateReason: v2Gate.reason,
+        v2GateReason: gateReason,
         source,
       };
 
       this.agentBus.messages.unshift({
         id: `MSG_${Date.now()}`,
         timestamp: new Date().toISOString(),
-        from: 'Built-In Co-Agent (1H & Risk)',
+        from: `Built-In Co-Agent (${timeframe} Sniper)`,
         type: 'SIGNAL_REVIEW',
         symbol,
         verdict: coAgentReview.verdict,
         confidence: coAgentReview.confidence,
-        text: `[${symbol} ${sig.side} -> ${coAgentReview.verdict} (${coAgentReview.confidence}%)] ${coAgentReview.reasoning}`,
+        text: `[${timeframe.toUpperCase()} ${symbol} ${sig.side} -> ${coAgentReview.verdict} (${coAgentReview.confidence}%)] ${coAgentReview.reasoning}`,
       });
       this._saveAgentBus();
 
@@ -1234,10 +1317,16 @@ export class LivePaperTrader {
       if (this.state.signalsFeed.length > 100) this.state.signalsFeed.pop();
 
       if (canOpenV1) {
-        this._openPaperPosition(signalRecord, this.state, 'V1');
+        this._openPaperPosition(signalRecord, this.state, '5M_SNIPER');
+        this.proprTrader.executeSignal(signalRecord).catch((err) => {
+          console.error('PROPR Auto-Trader (5m) error:', err.message);
+        });
       }
       if (canOpenV2) {
-        this._openPaperPosition(signalRecord, this.state.v2Account, 'V2');
+        this._openPaperPosition(signalRecord, this.state.v2Account, '15M_SNIPER');
+        this.proprTrader.executeSignal(signalRecord).catch((err) => {
+          console.error('PROPR Auto-Trader (15m) error:', err.message);
+        });
       }
       this._dispatchExternalAlert(signalRecord).catch(() => {});
     }
@@ -1245,22 +1334,28 @@ export class LivePaperTrader {
 
   async _enrichLatestBarWithLiveDeals(symbol, candles) {
     if (!candles || candles.length === 0) return;
-    const url = `https://contract.mexc.com/api/v1/contract/deals/${encodeURIComponent(symbol)}`;
+    const coin = this.fetcher._toHyperliquidCoin(symbol);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3500);
     try {
-      const res = await fetch(url, { signal: controller.signal });
+      const res = await fetch('https://api.hyperliquid.xyz/info', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'recentTrades', coin }),
+      });
       if (!res.ok) return;
-      const json = await res.json();
-      if (!json.success || !Array.isArray(json.data)) return;
+      const trades = await res.json();
+      if (!Array.isArray(trades) || trades.length === 0) return;
 
       const lastCandle = candles[candles.length - 1];
       let buyVol = 0;
       let sellVol = 0;
-      for (const deal of json.data) {
-        if (deal.t >= lastCandle.timestamp) {
-          if (deal.T === 1) buyVol += Number(deal.v || 0);
-          else sellVol += Number(deal.v || 0);
+      for (const t of trades) {
+        if (Number(t.time) >= lastCandle.timestamp) {
+          const sz = Number(t.sz || 0);
+          if (t.side === 'B') buyVol += sz;
+          else sellVol += sz;
         }
       }
       const totalDealVol = buyVol + sellVol;
@@ -1313,7 +1408,9 @@ export class LivePaperTrader {
       return null;
     }
 
-    let qty = riskUsd / stopDistance;
+    const takerRate = this.state.takerFeeRate || 0.00045;
+    const allInRiskPerUnit = stopDistance + (sig.entryPrice + sig.stopLoss) * takerRate;
+    let qty = riskUsd / allInRiskPerUnit;
     const maxNotional = equity * (this.state.maxLeverage || 10);
     if (qty * sig.entryPrice > maxNotional) {
       qty = maxNotional / sig.entryPrice;
@@ -1632,7 +1729,7 @@ export class LivePaperTrader {
             : '_No V2 Sniper open positions_';
 
         const reply =
-          `🤖 *24/7 MEXC DUAL-ACCOUNT BOT STATUS*\n\n` +
+          `🤖 *24/7 HYPERLIQUID (PROPR) DUAL-ACCOUNT BOT STATUS*\n\n` +
           `🎯 *ACCOUNT 2: V2 BTC-COMPASS SNIPER (NEW)*\n` +
           `• Live Equity: \`$${v2.account.liveEquity}\` (${v2.account.netPnlUsd >= 0 ? '+' : ''}$${v2.account.netPnlUsd})\n` +
           `• Closed Trades: \`${v2.account.closedTradesCount}\` (WR: \`${v2.account.winRatePct}%\`)\n` +
@@ -1694,7 +1791,7 @@ export class LivePaperTrader {
       : '';
 
     const text =
-      `🚨 *MEXC FUTURES 5m OB + ORDER FLOW SIGNAL*\n` +
+      `🚨 *HYPERLIQUID (PROPR) 5m OB + ORDER FLOW SIGNAL*\n` +
       `${acctHeader}\n` +
       `Pair: \`${sig.symbol}\` | Side: *${sig.side}*\n` +
       `Grade: *${sig.grade || 'A-GRADE'} (${sig.confluenceScore}/100 pts)*\n\n` +
@@ -1732,7 +1829,7 @@ export class LivePaperTrader {
       .join('\n');
 
     const text =
-      `✅ *MEXC Dual-Account Bot Connected (V1 Ongoing + V2 BTC-Compass Sniper)!*\n\n` +
+      `✅ *Hyperliquid (PROPR) 5m Dual-Account Bot Connected (V1 Ongoing + V2 BTC-Compass Sniper)!*\n\n` +
       `🎯 *Min Confluence Score:* \`${this.state.minScoreThreshold || 60}/100 pts\`\n` +
       `📡 *Active Watched Markets (${this.symbols.length}):*\n${marketsList}`;
 
@@ -1868,18 +1965,18 @@ export class LivePaperTrader {
 
     const v1Portfolio = this._buildPortfolioSnapshot(
       this.state,
-      'V1 Ongoing Baseline (Original Rules)',
+      'Account 1: Strat 1 — 5m Sniper (PROPR 5K)',
       new Date(this.state.campaignStartTimestamp).toISOString()
     );
     const v2Portfolio = this._buildPortfolioSnapshot(
       this.state.v2Account || {
-        initialEquity: 10000,
-        currentEquity: 10000,
+        initialEquity: 5000,
+        currentEquity: 5000,
         maxDrawdownPct: 0,
         openPositions: [],
         closedTrades: [],
       },
-      'V2 BTC-Compass Sniper (4-Pillar BTC + Single-Side + Tournament)',
+      'Account 2: Strat 2 — 15m Sniper (PROPR 5K)',
       this.state.v2Account?.startedAt || new Date().toISOString()
     );
 
@@ -1899,6 +1996,7 @@ export class LivePaperTrader {
       },
       v1Portfolio,
       v2Portfolio,
+      propr: this.proprTrader.getPublicStatus(),
       account: v1Portfolio.account,
       scoreTierAnalytics: v1Portfolio.scoreTierAnalytics,
       openPositions: v1Portfolio.openPositions,
