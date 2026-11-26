@@ -248,7 +248,9 @@
 
   <!-- TAB 1: LIVE SIGNALS & 7-DAY PAPER TRADER -->
   <div id="liveView">
-    <!-- DUAL-ACCOUNT SIDE-BY-SIDE COMPARISON & SWITCHER (V2 SNIPER NEW vs V1 ONGOING) -->
+    <!-- PROPR 5K EVAL LIVE STATUS BAR (Mirrors PROPR Top Bar 1:1) -->
+    <div id="proprEvalBar" style="margin-bottom:10px;"></div>
+    <!-- DUAL-ACCOUNT SIDE-BY-SIDE COMPARISON & SWITCHER (Strat 1: 5m vs Strat 2: 15m) -->
     <div id="dualAccountSwitcherBox" style="margin-bottom:12px;"></div>
     <div class="kpi-grid" id="liveKpiGrid"></div>
 
@@ -872,6 +874,91 @@ Please do these 2 steps right now to link with Agent 1:
       const activePort = selectedAccountMode === 'V2' ? v2Port : v1Port;
       const acc = activePort.account;
       const camp = data.campaign;
+
+      // Render PROPR 5K EVAL Live Status Bar (Matches PROPR Header 1:1)
+      const evalBar = document.getElementById('proprEvalBar');
+      if (evalBar) {
+        const initEq = Number(acc.initialEquity || 5000);
+        const bal = Number(acc.realizedEquity ?? initEq);
+        const liveEq = Number(acc.liveEquity ?? bal);
+        const netPnl = Number((liveEq - initEq).toFixed(2));
+        const profitTarget = Number((initEq * 0.09).toFixed(2)); // $450 on $5K
+        const maxDrawdown = Number((initEq * 0.03).toFixed(2));  // $150 on $5K
+        const maxDailyLoss = Number((bal * 0.03).toFixed(2));    // 3% daily loss limit (~$150 on $5K)
+
+        // Drawdown Used = distance below starting balance (or below peak equity)
+        const ddUsed = Math.max(0, Number((initEq - liveEq).toFixed(2)));
+        const ddPct = Math.min(100, (ddUsed / Math.max(1, maxDrawdown)) * 100);
+        const profitPct = Math.max(0, Math.min(100, (netPnl / Math.max(1, profitTarget)) * 100));
+
+        // Today's Realized + Unrealized Loss (UTC Day)
+        const todayStart = new Date();
+        todayStart.setUTCHours(0, 0, 0, 0);
+        const todayClosedPnl = (activePort.closedTrades || [])
+          .filter((t) => new Date(t.closedAt || t.openedAt).getTime() >= todayStart.getTime())
+          .reduce((sum, t) => sum + Number(t.realizedPnlUsd || 0), 0);
+        const todayNetPnl = todayClosedPnl + Number(acc.unrealizedPnlUsd || 0);
+        const dailyLossUsed = Math.max(0, Number((-todayNetPnl).toFixed(2)));
+        const dailyLossPct = Math.min(100, (dailyLossUsed / Math.max(1, maxDailyLoss)) * 100);
+
+        const isPassed = netPnl >= profitTarget;
+        const isBreached = ddUsed >= maxDrawdown || dailyLossUsed >= maxDailyLoss;
+        const statusBadge = isPassed
+          ? '<span style="background:#10b981; color:#fff; padding:3px 9px; border-radius:6px; font-weight:800; font-size:0.75rem;">🏆 PASSED</span>'
+          : isBreached
+          ? '<span style="background:#ef4444; color:#fff; padding:3px 9px; border-radius:6px; font-weight:800; font-size:0.75rem;">❌ BREACHED</span>'
+          : '<span style="background:#1e293b; color:#34d399; border:1px solid #10b98155; padding:3px 9px; border-radius:6px; font-weight:700; font-size:0.75rem;">● ACTIVE</span>';
+
+        const tfTag = selectedAccountMode === 'V2' ? '15m' : '5m';
+        const ddBarColor = ddPct >= 75 ? '#ef4444' : '#f59e0b';
+        const dailyBarColor = dailyLossPct >= 75 ? '#ef4444' : '#f59e0b';
+
+        evalBar.innerHTML = `
+          <div style="background:#0b101b; border:1px solid #1e293b; border-radius:9px; padding:9px 14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; font-size:0.8rem;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="background:#162033; color:#94a3b8; border:1px solid #293548; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700;">EVAL</span>
+              <span style="font-weight:800; color:#f8fafc;">5K</span>
+              <span style="color:#64748b; font-size:0.74rem;">#${tfTag.toUpperCase()}</span>
+            </div>
+
+            <div style="border-left:1px solid #1e293b; padding-left:12px;">
+              <span style="color:#94a3b8;">Balance</span>
+              <b style="color:#f8fafc; margin-left:4px;">$${bal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+            </div>
+
+            <div>
+              <span style="color:#94a3b8;">Equity</span>
+              <b style="color:${liveEq >= initEq ? '#34d399' : '#f87171'}; margin-left:4px;">$${liveEq.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+            </div>
+
+            <div style="border-left:1px solid #1e293b; padding-left:12px; display:flex; align-items:center; gap:8px;">
+              <span style="color:#94a3b8;">Profit Target</span>
+              <div style="width:68px; height:6px; background:#1e293b; border-radius:999px; overflow:hidden;">
+                <div style="width:${profitPct.toFixed(1)}%; height:100%; background:#10b981; border-radius:999px;"></div>
+              </div>
+              <span><b style="color:${netPnl >= 0 ? '#34d399' : '#f87171'};">${netPnl >= 0 ? '+' : '-'}$${Math.abs(netPnl).toFixed(2)}</b> <span style="color:#64748b;">/ $${profitTarget.toFixed(2)}</span></span>
+            </div>
+
+            <div style="border-left:1px solid #1e293b; padding-left:12px; display:flex; align-items:center; gap:8px;">
+              <span style="color:#94a3b8;">Drawdown Used</span>
+              <div style="width:68px; height:6px; background:#1e293b; border-radius:999px; overflow:hidden;">
+                <div style="width:${ddPct.toFixed(1)}%; height:100%; background:${ddBarColor}; border-radius:999px;"></div>
+              </div>
+              <span><b style="color:${ddUsed > 0 ? ddBarColor : '#e2e8f0'};">$${ddUsed.toFixed(2)}</b> <span style="color:#64748b;">/ $${maxDrawdown.toFixed(2)}</span></span>
+            </div>
+
+            <div style="border-left:1px solid #1e293b; padding-left:12px; display:flex; align-items:center; gap:8px;">
+              <span style="color:#94a3b8;">Daily Loss</span>
+              <div style="width:68px; height:6px; background:#1e293b; border-radius:999px; overflow:hidden;">
+                <div style="width:${dailyLossPct.toFixed(1)}%; height:100%; background:${dailyBarColor}; border-radius:999px;"></div>
+              </div>
+              <span><b style="color:${dailyLossUsed > 0 ? dailyBarColor : '#e2e8f0'};">$${dailyLossUsed.toFixed(2)}</b> <span style="color:#64748b;">/ $${maxDailyLoss.toFixed(2)}</span></span>
+            </div>
+
+            <div style="margin-left:auto;">${statusBadge}</div>
+          </div>
+        `;
+      }
 
       // Render Side-by-Side Dual-Timeframe Sniper Comparison (Strat 1: 5m vs Strat 2: 15m)
       const dualBox = document.getElementById('dualAccountSwitcherBox');
